@@ -534,11 +534,23 @@ func (self *Blockchain) GetLogs(fromBlock uint64, toBlock uint64) ([]common.KNLo
 			})
 			noCatLog++
 		case feeToWalletEvent, burnFeeEvent, tradeEvent:
-			if result, err = updateTradeLogs(result, logItem, ts, self.GetEthRate); err != nil {
+			if result, err = updateTradeLogs(result, logItem, ts); err != nil {
 				return result, err
 			}
 		default:
 			log.Printf("Unknown topic: %s", topic.Hex())
+		}
+	}
+
+	for i, logItem := range result {
+		tradeLog, ok := logItem.(common.TradeLog)
+		if !ok {
+			continue
+		}
+
+		ethRate := self.GetEthRate(tradeLog.Timestamp / 1000000)
+		if ethRate != 0 {
+			result[i] = calculateFiatAmount(tradeLog, ethRate)
 		}
 	}
 

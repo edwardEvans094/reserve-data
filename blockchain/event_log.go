@@ -11,9 +11,25 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-type ethRateResolver func(timepoint uint64) float64
+// calculateFiatAmount returns new TradeLog with fiat amount calculated.
+func calculateFiatAmount(tradeLog common.TradeLog, rate float64) common.TradeLog {
+	eth := common.ETHToken()
+	ethAmount := new(big.Float)
+	// TODO: update the ETH amount calculation
+	if strings.ToLower(eth.Address) == strings.ToLower(tradeLog.SrcAddress.String()) {
+		ethAmount.SetInt(tradeLog.SrcAmount)
+	} else {
+		ethAmount.SetInt(tradeLog.DestAmount)
+	}
 
-func updateTradeLogs(allLogs []common.KNLog, logItem types.Log, ts uint64, ethFn ethRateResolver) ([]common.KNLog, error) {
+	// fiat amount = ETH amount * rate
+	ethAmount = ethAmount.Mul(ethAmount, new(big.Float).SetFloat64(rate))
+	ethAmount.Quo(ethAmount, new(big.Float).SetFloat64(math.Pow10(18)))
+	tradeLog.FiatAmount, _ = ethAmount.Float64()
+	return tradeLog
+}
+
+func updateTradeLogs(allLogs []common.KNLog, logItem types.Log, ts uint64) ([]common.KNLog, error) {
 	var (
 		tradeLog      common.TradeLog
 		updateLastLog = false
@@ -56,22 +72,6 @@ func updateTradeLogs(allLogs []common.KNLog, logItem types.Log, ts uint64, ethFn
 		tradeLog.SrcAmount = srcAmount.Big()
 		tradeLog.DestAmount = destAmount.Big()
 		tradeLog.UserAddress = ethereum.BytesToAddress(logItem.Topics[1].Bytes())
-
-		if ethRate := ethFn(tradeLog.Timestamp / 1000000); ethRate != 0 {
-			eth := common.ETHToken()
-			ethAmount := new(big.Float)
-			// TODO: update the ETH amount calculation
-			if strings.ToLower(eth.Address) == strings.ToLower(srcAddr.String()) {
-				ethAmount.SetInt(tradeLog.SrcAmount)
-			} else {
-				ethAmount.SetInt(tradeLog.DestAmount)
-			}
-
-			// fiat amount = ETH amount * rate
-			ethAmount = ethAmount.Mul(ethAmount, new(big.Float).SetFloat64(ethRate))
-			ethAmount.Quo(ethAmount, new(big.Float).SetFloat64(math.Pow10(18)))
-			tradeLog.FiatAmount, _ = ethAmount.Float64()
-		}
 	}
 
 	if updateLastLog {

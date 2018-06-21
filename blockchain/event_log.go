@@ -31,7 +31,7 @@ func calculateFiatAmount(tradeLog common.TradeLog, rate float64) common.TradeLog
 
 	// fiat amount = ETH amount * rate
 	ethAmount = ethAmount.Mul(ethAmount, new(big.Float).SetFloat64(rate))
-	ethAmount.Quo(ethAmount, new(big.Float).SetFloat64(math.Pow10(18)))
+	ethAmount.Quo(ethAmount, new(big.Float).SetFloat64(math.Pow10(int(eth.Decimal))))
 	tradeLog.FiatAmount, _ = ethAmount.Float64()
 
 	return tradeLog

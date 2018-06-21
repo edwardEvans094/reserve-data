@@ -12,20 +12,28 @@ import (
 )
 
 // calculateFiatAmount returns new TradeLog with fiat amount calculated.
+// * For ETH-Token or Token-ETH conversions, the ETH amount is taken from ExecuteTrade event.
+// * For Token-Token, the ETH amount is reading from EtherReceival event.
 func calculateFiatAmount(tradeLog common.TradeLog, rate float64) common.TradeLog {
 	eth := common.ETHToken()
 	ethAmount := new(big.Float)
-	// TODO: update the ETH amount calculation
+
 	if strings.ToLower(eth.Address) == strings.ToLower(tradeLog.SrcAddress.String()) {
+		// ETH-Token
 		ethAmount.SetInt(tradeLog.SrcAmount)
-	} else {
+	} else if strings.ToLower(eth.Address) == strings.ToLower(tradeLog.DestAddress.String()) {
+		// Token-ETH
 		ethAmount.SetInt(tradeLog.DestAmount)
+	} else if tradeLog.EtherReceivalAmount != nil {
+		// Token-Token
+		ethAmount.SetInt(tradeLog.EtherReceivalAmount)
 	}
 
 	// fiat amount = ETH amount * rate
 	ethAmount = ethAmount.Mul(ethAmount, new(big.Float).SetFloat64(rate))
 	ethAmount.Quo(ethAmount, new(big.Float).SetFloat64(math.Pow10(18)))
 	tradeLog.FiatAmount, _ = ethAmount.Float64()
+
 	return tradeLog
 }
 
@@ -43,16 +51,18 @@ func updateTradeLogs(allLogs []common.KNLog, logItem types.Log, ts uint64) ([]co
 	// otherwise append new one
 	if len(allLogs) > 0 && allLogs[len(allLogs)-1].TxHash() == logItem.TxHash {
 		var ok bool
-		if tradeLog, ok = allLogs[len(allLogs)-1].(common.TradeLog); !ok {
+		if tradeLog, ok = allLogs[len(allLogs)-1].(common.TradeLog); ok {
 			updateLastLog = true
 		}
 	}
 
-	tradeLog = common.TradeLog{
-		BlockNumber:     logItem.BlockNumber,
-		TransactionHash: logItem.TxHash,
-		Index:           logItem.Index,
-		Timestamp:       ts,
+	if !updateLastLog {
+		tradeLog = common.TradeLog{
+			BlockNumber:     logItem.BlockNumber,
+			TransactionHash: logItem.TxHash,
+			Index:           logItem.Index,
+			Timestamp:       ts,
+		}
 	}
 
 	switch logItem.Topics[0].Hex() {
@@ -65,6 +75,10 @@ func updateTradeLogs(allLogs []common.KNLog, logItem types.Log, ts uint64) ([]co
 		reserveAddr, burnFees := logDataToBurnFeeParams(logItem.Data)
 		tradeLog.ReserveAddress = reserveAddr
 		tradeLog.BurnFee = burnFees.Big()
+	case etherReceivalEvent:
+		amount := logDataToEtherReceivalParams(logItem.Data)
+		tradeLog.EtherReceivalSender = ethereum.BytesToAddress(logItem.Topics[1].Bytes())
+		tradeLog.EtherReceivalAmount = amount.Big()
 	case tradeEvent:
 		srcAddr, destAddr, srcAmount, destAmount := logDataToTradeParams(logItem.Data)
 		tradeLog.SrcAddress = srcAddr
@@ -102,6 +116,11 @@ func logDataToBurnFeeParams(data []byte) (ethereum.Address, ethereum.Hash) {
 	reserveAddr := ethereum.BytesToAddress(data[0:32])
 	burnFees := ethereum.BytesToHash(data[32:64])
 	return reserveAddr, burnFees
+}
+
+func logDataToEtherReceivalParams(data []byte) ethereum.Hash {
+	amount := ethereum.BytesToHash(data[0:32])
+	return amount
 }
 
 func logDataToCatLog(data []byte) (ethereum.Address, string) {

@@ -565,8 +565,7 @@ func (self *Huobi) DepositStatus(id common.ActivityID, tx1Hash, currency string,
 				sentAmount,
 				common.GetTimestamp(),
 			)
-			err = self.storage.StorePendingIntermediateTx(id, data)
-			if err != nil {
+			if err = self.storage.StorePendingIntermediateTx(id, data); err != nil {
 				log.Printf("Trying to store 2nd tx to pending tx storage failed, error: %s. It will be ignored and can make us to send to huobi again and the deposit will be marked as failed because the fund is not efficient", err.Error())
 			}
 			return "", nil
@@ -619,14 +618,8 @@ func (self *Huobi) DepositStatus(id common.ActivityID, tx1Hash, currency string,
 						sentAmount,
 						common.GetTimestamp(),
 					)
-
 					if err = self.storage.StoreIntermediateTx(id, data); err != nil {
 						log.Printf("Huobi Trying to store intermediate tx to huobi storage, error: %s. Ignore it and try later", err.Error())
-						return "", nil
-					}
-
-					if err = self.storage.RemovePendingIntermediateTx(id); err != nil {
-						log.Printf("Huobi Trying to remove pending intermediate tx from huobi storage, error: %s. Ignore it and treat it like it is still pending", err.Error())
 						return "", nil
 					}
 					return "done", nil
@@ -662,17 +655,11 @@ func (self *Huobi) DepositStatus(id common.ActivityID, tx1Hash, currency string,
 				sentAmount,
 				common.GetTimestamp(),
 			)
-
 			if err = self.storage.StoreIntermediateTx(id, data); err != nil {
 				log.Printf("Huobi Trying to store intermediate tx failed, error: %s. Ignore it and treat it like it is still pending", err.Error())
 				return "", nil
 			}
-
-			if err = self.storage.RemovePendingIntermediateTx(id); err != nil {
-				log.Printf("Huobi Trying to remove pending intermediate tx from huobi storage, error: %s. Ignore it and treat it like it is still pending", err.Error())
-				return "", nil
-			}
-			log.Printf("Huobi The tx is not found for over 15mins, it is considered as lost and the deposit failed")
+			log.Printf("The tx is not found for over 15mins, it is considered as lost and the deposit failed")
 			return "failed", nil
 		}
 		return "", nil
@@ -719,6 +706,7 @@ func (self *Huobi) OrderStatus(id string, base, quote string) (string, error) {
 	return "done", nil
 }
 
+//NewHuobi creates new Huobi exchange instance
 func NewHuobi(
 	interf HuobiInterface,
 	blockchain *blockchain.BaseBlockchain,

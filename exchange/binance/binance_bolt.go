@@ -103,7 +103,7 @@ func (self *BinanceStorage) GetTradeHistory(fromTime, toTime uint64) (common.Exc
 	return result, err
 }
 
-func (self *BinanceStorage) GetLastIDTradeHistory(exchange, pair string) (string, error) {
+func (self *BinanceStorage) GetLastIDTradeHistory(pair string) (string, error) {
 	history := common.TradeHistory{}
 	err := self.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(TRADE_HISTORY))

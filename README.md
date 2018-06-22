@@ -29,7 +29,7 @@ sample:
   "keystore_path": "path to the JSON keystore file, recommended to be absolute path",
   "passphrase": "passphrase to unlock the JSON keystore"
   "keystore_deposit_path": "path to the JSON keystore file that will be used to deposit",
-  "passphrase_deposit": "passphrase to unlock the JSON keytore"
+  "passphrase_deposit": "passphrase to unlock the JSON keystore"
 }
 ```
 

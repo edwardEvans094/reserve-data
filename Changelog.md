@@ -13,6 +13,7 @@
 ### Improvements:
 
 - Remove many unused methods (#309)
+- Refactor GasOracle (#318)
 
 ### Compatibility:
 

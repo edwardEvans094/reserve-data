@@ -66,7 +66,6 @@ type Blockchain struct {
 	localSetRateNonce     uint64
 	setRateNonceTimestamp uint64
 	setting               Setting
-	gasOracle             *GasOracle
 }
 
 func (self *Blockchain) StandardGasPrice() float64 {
@@ -77,10 +76,6 @@ func (self *Blockchain) StandardGasPrice() float64 {
 		return 0
 	}
 	return common.BigToFloat(price, 9)
-}
-
-func (self *Blockchain) AddGasOracle(gasOracle *GasOracle) {
-	self.gasOracle = gasOracle
 }
 
 func (self *Blockchain) AddOldNetwork(addr ethereum.Address) error {

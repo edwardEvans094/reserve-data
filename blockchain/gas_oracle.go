@@ -2,31 +2,67 @@ package blockchain
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 )
 
-const GasStationUrl = "https://ethgasstation.info/json/ethgasAPI.json"
+const gasStationURL = "https://ethgasstation.info/json/ethgasAPI.json"
 
-type GasOracle struct {
+type gasStationResponse struct {
 	Standard float64 `json:"average"`
 	Fast     float64 `json:"fast"`
 	SafeLow  float64 `json:"safeLow"`
 }
 
-func NewGasOracle() *GasOracle {
-	gasOracle := &GasOracle{}
-	gasOracle.GasPricing()
-	return gasOracle
+// GasOracle is an ETH Gas Station client.
+type GasOracle struct {
+	client *http.Client
+	m      sync.RWMutex
+
+	standard float64
+	fast     float64
+	safeLow  float64
 }
 
-func (self *GasOracle) GasPricing() {
+// NewGasOracle create new GasOracle instance.
+func NewGasOracle() *GasOracle {
+	client := &http.Client{Timeout: 10 * time.Second}
+	return &GasOracle{client: client}
+}
+
+// Standard returns standard gas pricing.
+func (gso *GasOracle) Standard() float64 {
+	gso.m.RLock()
+	defer gso.m.RLock()
+
+	return gso.standard
+}
+
+// Fast returns the fast gas pricing.
+func (gso *GasOracle) Fast() float64 {
+	gso.m.RLock()
+	defer gso.m.RLock()
+
+	return gso.fast
+}
+
+// SafeLow returns the safe low gas pricing.
+func (gso *GasOracle) SafeLow() float64 {
+	gso.m.RLock()
+	defer gso.m.RLock()
+
+	return gso.safeLow
+}
+
+// Fetch periodically polls ETH Gas Station server and update the
+// recommendation gas prices.
+func (gso *GasOracle) Fetch() {
 	ticker := time.NewTicker(10 * time.Second)
 	go func() {
 		for {
-			err := self.RunGasPricing()
+			err := gso.runGasPricing()
 			if err != nil {
 				log.Printf("Error pricing gas from Gasstation: %v", err)
 			}
@@ -35,9 +71,11 @@ func (self *GasOracle) GasPricing() {
 	}()
 }
 
-func (self *GasOracle) RunGasPricing() error {
-	client := &http.Client{Timeout: 10 * time.Second}
-	r, err := client.Get(GasStationUrl)
+func (gso *GasOracle) runGasPricing() error {
+	gso.m.Lock()
+	defer gso.m.Unlock()
+
+	r, err := gso.client.Get(gasStationURL)
 	if err != nil {
 		return err
 	}
@@ -47,21 +85,13 @@ func (self *GasOracle) RunGasPricing() error {
 		}
 	}()
 
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
+	rsp := &gasStationResponse{}
+	if err = json.NewDecoder(r.Body).Decode(rsp); err != nil {
 		return err
 	}
-	gasOracle := GasOracle{}
-	err = json.Unmarshal(body, &gasOracle)
-	if err != nil {
-		return err
-	}
-	self.Set(gasOracle)
-	return nil
-}
 
-func (self *GasOracle) Set(gasOracle GasOracle) {
-	self.SafeLow = gasOracle.SafeLow
-	self.Standard = gasOracle.Standard
-	self.Fast = gasOracle.Fast
+	gso.standard = rsp.Standard
+	gso.safeLow = rsp.SafeLow
+	gso.fast = rsp.Fast
+	return nil
 }

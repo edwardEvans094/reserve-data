@@ -12,7 +12,6 @@ type HuobiStorage interface {
 	// get intermediate tx corresponding to the id. It can be done, failed or pending
 	GetIntermedatorTx(id common.ActivityID) (common.TXEntry, error)
 	GetPendingIntermediateTXs() (map[common.ActivityID]common.TXEntry, error)
-	RemovePendingIntermediateTx(id common.ActivityID) error
 
 	StoreTradeHistory(data common.ExchangeTradeHistory) error
 

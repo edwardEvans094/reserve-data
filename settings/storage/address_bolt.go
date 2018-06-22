@@ -10,52 +10,9 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-const (
-	ADDRESS_SETTING_BUCKET     string = "address_setting"
-	ADDRESS_SET_SETTING_BUCKET string = "address_set_setting"
-)
-
-type BoltAddressStorage struct {
-	db *bolt.DB
-}
-
-func NewBoltAddressStorage(dbPath string) (*BoltAddressStorage, error) {
-	var err error
-	var db *bolt.DB
-	db, err = bolt.Open(dbPath, 0600, nil)
-	if err != nil {
-		return nil, err
-	}
-	err = db.Update(func(tx *bolt.Tx) error {
-		if _, uErr := tx.CreateBucketIfNotExists([]byte(ADDRESS_SETTING_BUCKET)); err != nil {
-			return uErr
-		}
-		if _, uErr := tx.CreateBucketIfNotExists([]byte(ADDRESS_SET_SETTING_BUCKET)); err != nil {
-			return uErr
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &BoltAddressStorage{db}, nil
-}
-
-func (self *BoltAddressStorage) UpdateOneAddress(name settings.AddressName, address string) error {
-	address = strings.ToLower(address)
-	err := self.db.Update(func(tx *bolt.Tx) error {
-		b, uErr := tx.CreateBucketIfNotExists([]byte(ADDRESS_SETTING_BUCKET))
-		if uErr != nil {
-			return uErr
-		}
-		return b.Put(boltutil.Uint64ToBytes(uint64(name)), []byte(address))
-	})
-	return err
-}
-
-func (self *BoltAddressStorage) GetAddress(add settings.AddressName) (string, error) {
+func (boltSettingStorage *BoltSettingStorage) GetAddress(add settings.AddressName) (string, error) {
 	var address string
-	err := self.db.View(func(tx *bolt.Tx) error {
+	err := boltSettingStorage.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(ADDRESS_SETTING_BUCKET))
 		if b == nil {
 			return fmt.Errorf("Bucket doesn't exist yet")
@@ -70,10 +27,10 @@ func (self *BoltAddressStorage) GetAddress(add settings.AddressName) (string, er
 	return address, err
 }
 
-func (self *BoltAddressStorage) AddAddressToSet(setName settings.AddressSetName, address string) error {
+func (boltSettingStorage *BoltSettingStorage) AddAddressToSet(setName settings.AddressSetName, address string) error {
 	address = strings.ToLower(address)
 	defaultValue := "1"
-	err := self.db.Update(func(tx *bolt.Tx) error {
+	err := boltSettingStorage.db.Update(func(tx *bolt.Tx) error {
 		b, uErr := tx.CreateBucketIfNotExists([]byte(ADDRESS_SET_SETTING_BUCKET))
 		if uErr != nil {
 			return uErr
@@ -87,9 +44,9 @@ func (self *BoltAddressStorage) AddAddressToSet(setName settings.AddressSetName,
 	return err
 }
 
-func (self *BoltAddressStorage) GetAddresses(setName settings.AddressSetName) ([]string, error) {
+func (boltSettingStorage *BoltSettingStorage) GetAddresses(setName settings.AddressSetName) ([]string, error) {
 	result := []string{}
-	err := self.db.View(func(tx *bolt.Tx) error {
+	err := boltSettingStorage.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(ADDRESS_SET_SETTING_BUCKET))
 		if b == nil {
 			return errors.New("Bucket doesn't exist yet")
@@ -132,9 +89,9 @@ func CountAddressBucket(b *bolt.Bucket) uint64 {
 	return result
 }
 
-func (self *BoltAddressStorage) CountAddress() (uint64, error) {
+func (boltSettingStorage *BoltSettingStorage) CountAddress() (uint64, error) {
 	var result uint64
-	err := self.db.View(func(tx *bolt.Tx) error {
+	err := boltSettingStorage.db.View(func(tx *bolt.Tx) error {
 
 		b := tx.Bucket([]byte(ADDRESS_SET_SETTING_BUCKET))
 		if b == nil {

@@ -6,60 +6,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/KyberNetwork/reserve-data/boltutil"
 	"github.com/KyberNetwork/reserve-data/common"
+	"github.com/KyberNetwork/reserve-data/settings"
 	"github.com/boltdb/bolt"
 	ethereum "github.com/ethereum/go-ethereum/common"
 )
-
-const (
-	TOKEN_BUCKET_BY_ID      string = "token_by_id"
-	TOKEN_BUCKET_BY_ADDRESS string = "token_by_addr"
-)
-
-type FilterFunction func(common.Token) bool
-
-func isActive(t common.Token) bool {
-	return t.Active
-}
-
-func isToken(_ common.Token) bool {
-	return true
-}
-
-func isInternal(t common.Token) bool {
-	return t.Active && t.Internal
-}
-
-func isExternal(t common.Token) bool {
-	return t.Active && !t.Internal
-}
-
-type BoltTokenStorage struct {
-	db *bolt.DB
-}
-
-func NewBoltTokenStorage(dbPath string) (*BoltTokenStorage, error) {
-	var err error
-	var db *bolt.DB
-	db, err = bolt.Open(dbPath, 0600, nil)
-	if err != nil {
-		return nil, err
-	}
-	err = db.Update(func(tx *bolt.Tx) error {
-		if _, uErr := tx.CreateBucketIfNotExists([]byte(TOKEN_BUCKET_BY_ID)); err != nil {
-			return uErr
-		}
-		if _, uErr := tx.CreateBucketIfNotExists([]byte(TOKEN_BUCKET_BY_ADDRESS)); err != nil {
-			return uErr
-		}
-		return nil
-	})
-	if err != nil {
-		panic(err)
-	}
-	storage := BoltTokenStorage{db}
-	return &storage, nil
-}
 
 func addTokenByID(tx *bolt.Tx, t common.Token) error {
 	b, uErr := tx.CreateBucketIfNotExists([]byte(TOKEN_BUCKET_BY_ID))
@@ -85,8 +37,8 @@ func addTokenByAddress(tx *bolt.Tx, t common.Token) error {
 	return b.Put([]byte(strings.ToLower(t.Address)), dataJson)
 }
 
-func (self *BoltTokenStorage) UpdateToken(t common.Token) error {
-	err := self.db.Update(func(tx *bolt.Tx) error {
+func (boltSettingStorage *BoltSettingStorage) UpdateToken(t common.Token) error {
+	err := boltSettingStorage.db.Update(func(tx *bolt.Tx) error {
 		if uErr := addTokenByID(tx, t); uErr != nil {
 			return uErr
 		}
@@ -98,8 +50,8 @@ func (self *BoltTokenStorage) UpdateToken(t common.Token) error {
 	return err
 }
 
-func (self *BoltTokenStorage) AddTokenByID(t common.Token) error {
-	err := self.db.Update(func(tx *bolt.Tx) error {
+func (boltSettingStorage *BoltSettingStorage) AddTokenByID(t common.Token) error {
+	err := boltSettingStorage.db.Update(func(tx *bolt.Tx) error {
 		b, uErr := tx.CreateBucketIfNotExists([]byte(TOKEN_BUCKET_BY_ID))
 		if uErr != nil {
 			return uErr
@@ -113,8 +65,8 @@ func (self *BoltTokenStorage) AddTokenByID(t common.Token) error {
 	return err
 }
 
-func (self *BoltTokenStorage) AddTokenByAddress(t common.Token) error {
-	err := self.db.Update(func(tx *bolt.Tx) error {
+func (boltSettingStorage *BoltSettingStorage) AddTokenByAddress(t common.Token) error {
+	err := boltSettingStorage.db.Update(func(tx *bolt.Tx) error {
 		b, uErr := tx.CreateBucketIfNotExists([]byte(TOKEN_BUCKET_BY_ADDRESS))
 		if uErr != nil {
 			return uErr
@@ -128,8 +80,8 @@ func (self *BoltTokenStorage) AddTokenByAddress(t common.Token) error {
 	return err
 }
 
-func (self *BoltTokenStorage) getTokensWithFilter(filter FilterFunction) (result []common.Token, err error) {
-	err = self.db.View(func(tx *bolt.Tx) error {
+func (boltSettingStorage *BoltSettingStorage) getTokensWithFilter(filter FilterFunction) (result []common.Token, err error) {
+	err = boltSettingStorage.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(TOKEN_BUCKET_BY_ID))
 		if b == nil {
 			return fmt.Errorf("Bucket doesn't exist yet")
@@ -150,25 +102,25 @@ func (self *BoltTokenStorage) getTokensWithFilter(filter FilterFunction) (result
 	return result, err
 }
 
-func (self *BoltTokenStorage) GetAllTokens() (result []common.Token, err error) {
-	return self.getTokensWithFilter(isToken)
+func (boltSettingStorage *BoltSettingStorage) GetAllTokens() (result []common.Token, err error) {
+	return boltSettingStorage.getTokensWithFilter(isToken)
 }
 
-func (self *BoltTokenStorage) GetActiveTokens() (result []common.Token, err error) {
-	return self.getTokensWithFilter(isActive)
+func (boltSettingStorage *BoltSettingStorage) GetActiveTokens() (result []common.Token, err error) {
+	return boltSettingStorage.getTokensWithFilter(isActive)
 }
 
-func (self *BoltTokenStorage) GetInternalTokens() (result []common.Token, err error) {
-	return self.getTokensWithFilter(isInternal)
+func (boltSettingStorage *BoltSettingStorage) GetInternalTokens() (result []common.Token, err error) {
+	return boltSettingStorage.getTokensWithFilter(isInternal)
 }
 
-func (self *BoltTokenStorage) GetExternalTokens() (result []common.Token, err error) {
-	return self.getTokensWithFilter(isExternal)
+func (boltSettingStorage *BoltSettingStorage) GetExternalTokens() (result []common.Token, err error) {
+	return boltSettingStorage.getTokensWithFilter(isExternal)
 }
 
-func (self *BoltTokenStorage) getTokenByIDWithFiltering(id string, filter FilterFunction) (t common.Token, err error) {
+func (boltSettingStorage *BoltSettingStorage) getTokenByIDWithFiltering(id string, filter FilterFunction) (t common.Token, err error) {
 	id = strings.ToLower(id)
-	err = self.db.View(func(tx *bolt.Tx) error {
+	err = boltSettingStorage.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(TOKEN_BUCKET_BY_ID))
 		if b == nil {
 			return fmt.Errorf("Bucket doesn't exist yet")
@@ -190,25 +142,25 @@ func (self *BoltTokenStorage) getTokenByIDWithFiltering(id string, filter Filter
 	return t, err
 }
 
-func (self *BoltTokenStorage) GetTokenByID(id string) (common.Token, error) {
-	return self.getTokenByIDWithFiltering(id, isToken)
+func (boltSettingStorage *BoltSettingStorage) GetTokenByID(id string) (common.Token, error) {
+	return boltSettingStorage.getTokenByIDWithFiltering(id, isToken)
 }
 
-func (self *BoltTokenStorage) GetActiveTokenByID(id string) (common.Token, error) {
-	return self.getTokenByIDWithFiltering(id, isActive)
+func (boltSettingStorage *BoltSettingStorage) GetActiveTokenByID(id string) (common.Token, error) {
+	return boltSettingStorage.getTokenByIDWithFiltering(id, isActive)
 }
 
-func (self *BoltTokenStorage) GetInternalTokenByID(id string) (common.Token, error) {
-	return self.getTokenByIDWithFiltering(id, isInternal)
+func (boltSettingStorage *BoltSettingStorage) GetInternalTokenByID(id string) (common.Token, error) {
+	return boltSettingStorage.getTokenByIDWithFiltering(id, isInternal)
 }
 
-func (self *BoltTokenStorage) GetExternalTokenByID(id string) (common.Token, error) {
-	return self.getTokenByIDWithFiltering(id, isExternal)
+func (boltSettingStorage *BoltSettingStorage) GetExternalTokenByID(id string) (common.Token, error) {
+	return boltSettingStorage.getTokenByIDWithFiltering(id, isExternal)
 }
 
-func (self *BoltTokenStorage) getTokenByAddressWithFiltering(addr string, filter FilterFunction) (t common.Token, err error) {
+func (boltSettingStorage *BoltSettingStorage) getTokenByAddressWithFiltering(addr string, filter FilterFunction) (t common.Token, err error) {
 	addr = strings.ToLower(addr)
-	err = self.db.View(func(tx *bolt.Tx) error {
+	err = boltSettingStorage.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(TOKEN_BUCKET_BY_ADDRESS))
 		if b == nil {
 			return fmt.Errorf("Bucket doesn't exist yet")
@@ -230,18 +182,30 @@ func (self *BoltTokenStorage) getTokenByAddressWithFiltering(addr string, filter
 	return t, err
 }
 
-func (self *BoltTokenStorage) GetActiveTokenByAddress(Addr ethereum.Address) (common.Token, error) {
-	return self.getTokenByAddressWithFiltering(Addr.Hex(), isActive)
+func (boltSettingStorage *BoltSettingStorage) GetActiveTokenByAddress(Addr ethereum.Address) (common.Token, error) {
+	return boltSettingStorage.getTokenByAddressWithFiltering(Addr.Hex(), isActive)
 }
 
-func (self *BoltTokenStorage) GetTokenByAddress(Addr ethereum.Address) (common.Token, error) {
-	return self.getTokenByAddressWithFiltering(Addr.Hex(), isToken)
+func (boltSettingStorage *BoltSettingStorage) GetTokenByAddress(Addr ethereum.Address) (common.Token, error) {
+	return boltSettingStorage.getTokenByAddressWithFiltering(Addr.Hex(), isToken)
 }
 
-func (self *BoltTokenStorage) GetInternalTokenByAddress(Addr ethereum.Address) (common.Token, error) {
-	return self.getTokenByAddressWithFiltering(Addr.Hex(), isInternal)
+func (boltSettingStorage *BoltSettingStorage) GetInternalTokenByAddress(Addr ethereum.Address) (common.Token, error) {
+	return boltSettingStorage.getTokenByAddressWithFiltering(Addr.Hex(), isInternal)
 }
 
-func (self *BoltTokenStorage) GetExternalTokenByAddress(Addr ethereum.Address) (common.Token, error) {
-	return self.getTokenByAddressWithFiltering(Addr.Hex(), isExternal)
+func (boltSettingStorage *BoltSettingStorage) GetExternalTokenByAddress(Addr ethereum.Address) (common.Token, error) {
+	return boltSettingStorage.getTokenByAddressWithFiltering(Addr.Hex(), isExternal)
+}
+
+func (boltSettingStorage *BoltSettingStorage) UpdateOneAddress(name settings.AddressName, address string) error {
+	address = strings.ToLower(address)
+	err := boltSettingStorage.db.Update(func(tx *bolt.Tx) error {
+		b, uErr := tx.CreateBucketIfNotExists([]byte(ADDRESS_SETTING_BUCKET))
+		if uErr != nil {
+			return uErr
+		}
+		return b.Put(boltutil.Uint64ToBytes(uint64(name)), []byte(address))
+	})
+	return err
 }

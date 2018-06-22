@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -135,6 +136,98 @@ func (self *HTTPServer) AddAddressToSet(c *gin.Context) {
 		return
 	}
 	if err := self.setting.AddAddressToSet(addrSetName, addr); err != nil {
+		httputil.ResponseFailure(c, httputil.WithError(err))
+	}
+	httputil.ResponseSuccess(c)
+}
+
+func (self *HTTPServer) UpdateExchangeFee(c *gin.Context) {
+	postForm, ok := self.Authenticated(c, []string{"name", "data"}, []Permission{RebalancePermission, ConfigurePermission})
+	if !ok {
+		return
+	}
+	name := postForm.Get("name")
+	exName, ok := settings.ExchangTypeValues()[name]
+	if !ok {
+		httputil.ResponseFailure(c, httputil.WithError(fmt.Errorf("Exchange %s is not in current deployment", name)))
+		return
+	}
+	data := []byte(postForm.Get("data"))
+	var exFee common.ExchangeFees
+	if err := json.Unmarshal(data, &exFee); err != nil {
+		httputil.ResponseFailure(c, httputil.WithError(err))
+		return
+	}
+	if err := self.setting.UpdateFee(exName, exFee); err != nil {
+		httputil.ResponseFailure(c, httputil.WithError(err))
+	}
+	httputil.ResponseSuccess(c)
+}
+
+func (self *HTTPServer) UpdateExchangeMinDeposit(c *gin.Context) {
+	postForm, ok := self.Authenticated(c, []string{"name", "data"}, []Permission{RebalancePermission, ConfigurePermission})
+	if !ok {
+		return
+	}
+	name := postForm.Get("name")
+	exName, ok := settings.ExchangTypeValues()[name]
+	if !ok {
+		httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Exchange %s is not in current deployment", name)))
+		return
+	}
+	data := []byte(postForm.Get("data"))
+	var exMinDeposit common.ExchangesMinDeposit
+	if err := json.Unmarshal(data, &exMinDeposit); err != nil {
+		httputil.ResponseFailure(c, httputil.WithError(err))
+		return
+	}
+	if err := self.setting.UpdateMinDeposit(exName, exMinDeposit); err != nil {
+		httputil.ResponseFailure(c, httputil.WithError(err))
+	}
+	httputil.ResponseSuccess(c)
+}
+
+func (self *HTTPServer) UpdateDepositAddress(c *gin.Context) {
+	postForm, ok := self.Authenticated(c, []string{"name", "data"}, []Permission{RebalancePermission, ConfigurePermission})
+	if !ok {
+		return
+	}
+	name := postForm.Get("name")
+	exName, ok := settings.ExchangTypeValues()[name]
+	if !ok {
+		httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Exchange %s is not in current deployment", name)))
+		return
+	}
+	data := []byte(postForm.Get("data"))
+	var exDepositAddress common.ExchangeAddresses
+	if err := json.Unmarshal(data, &exDepositAddress); err != nil {
+		httputil.ResponseFailure(c, httputil.WithError(err))
+		return
+	}
+	if err := self.setting.UpdateDepositAddress(exName, exDepositAddress); err != nil {
+		httputil.ResponseFailure(c, httputil.WithError(err))
+	}
+	httputil.ResponseSuccess(c)
+}
+
+func (self *HTTPServer) UpdateExchangeInfo(c *gin.Context) {
+	postForm, ok := self.Authenticated(c, []string{"name", "data"}, []Permission{RebalancePermission, ConfigurePermission})
+	if !ok {
+		return
+	}
+	name := postForm.Get("name")
+	exName, ok := settings.ExchangTypeValues()[name]
+	if !ok {
+		httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Exchange %s is not in current deployment", name)))
+		return
+	}
+	data := []byte(postForm.Get("data"))
+	var exInfo common.ExchangeInfo
+	if err := json.Unmarshal(data, &exInfo); err != nil {
+		httputil.ResponseFailure(c, httputil.WithError(err))
+		return
+	}
+	if err := self.setting.UpdateExchangeInfo(exName, exInfo); err != nil {
 		httputil.ResponseFailure(c, httputil.WithError(err))
 	}
 	httputil.ResponseSuccess(c)

@@ -171,7 +171,7 @@ func (self *HTTPServer) Price(c *gin.Context) {
 	base := c.Param("base")
 	quote := c.Param("quote")
 	log.Printf("Getting price for %s - %s \n", base, quote)
-	pair, err := self.setting.NewTokenPair(base, quote)
+	pair, err := self.setting.NewTokenPairFromID(base, quote)
 	if err != nil {
 		httputil.ResponseFailure(c, httputil.WithReason("Token pair is not supported"))
 	} else {
@@ -646,14 +646,14 @@ func (self *HTTPServer) StoreMetrics(c *gin.Context) {
 func (self *HTTPServer) GetExchangeInfo(c *gin.Context) {
 	exchangeParam := c.Query("exchangeid")
 	if exchangeParam == "" {
-		data := map[string]map[common.TokenPairID]common.ExchangePrecisionLimit{}
+		data := map[string]common.ExchangeInfo{}
 		for _, ex := range common.SupportedExchanges {
 			exchangeInfo, err := ex.GetInfo()
 			if err != nil {
 				httputil.ResponseFailure(c, httputil.WithError(err))
 				return
 			}
-			data[string(ex.ID())] = exchangeInfo.GetData()
+			data[string(ex.ID())] = exchangeInfo
 		}
 		httputil.ResponseSuccess(c, httputil.WithData(data))
 	} else {
@@ -680,7 +680,7 @@ func (self *HTTPServer) GetPairInfo(c *gin.Context) {
 		httputil.ResponseFailure(c, httputil.WithError(err))
 		return
 	}
-	pair, err := self.setting.NewTokenPair(base, quote)
+	pair, err := self.setting.NewTokenPairFromID(base, quote)
 	if err != nil {
 		httputil.ResponseFailure(c, httputil.WithError(err))
 		return
@@ -701,7 +701,11 @@ func (self *HTTPServer) GetExchangeFee(c *gin.Context) {
 		httputil.ResponseFailure(c, httputil.WithError(err))
 		return
 	}
-	fee := exchange.GetFee()
+	fee, err := exchange.GetFee()
+	if err != nil {
+		httputil.ResponseFailure(c, httputil.WithError(err))
+		return
+	}
 	httputil.ResponseSuccess(c, httputil.WithData(fee))
 	return
 }
@@ -709,7 +713,11 @@ func (self *HTTPServer) GetExchangeFee(c *gin.Context) {
 func (self *HTTPServer) GetFee(c *gin.Context) {
 	data := map[string]common.ExchangeFees{}
 	for _, exchange := range common.SupportedExchanges {
-		fee := exchange.GetFee()
+		fee, err := exchange.GetFee()
+		if err != nil {
+			httputil.ResponseFailure(c, httputil.WithError(err))
+			return
+		}
 		data[string(exchange.ID())] = fee
 	}
 	httputil.ResponseSuccess(c, httputil.WithData(data))
@@ -719,7 +727,11 @@ func (self *HTTPServer) GetFee(c *gin.Context) {
 func (self *HTTPServer) GetMinDeposit(c *gin.Context) {
 	data := map[string]common.ExchangesMinDeposit{}
 	for _, exchange := range common.SupportedExchanges {
-		minDeposit := exchange.GetMinDeposit()
+		minDeposit, err := exchange.GetMinDeposit()
+		if err != nil {
+			httputil.ResponseFailure(c, httputil.WithError(err))
+			return
+		}
 		data[string(exchange.ID())] = minDeposit
 	}
 	httputil.ResponseSuccess(c, httputil.WithData(data))
@@ -1691,6 +1703,11 @@ func (self *HTTPServer) register() {
 	self.r.GET("/token-settings", self.TokenSettings)
 	self.r.POST("/update-address", self.UpdateAddress)
 	self.r.POST("/add-address-to-set", self.AddAddressToSet)
+	self.r.POST("/update-exchange-fee", self.UpdateExchangeFee)
+	self.r.POST("/update-exchange-mindeposit", self.UpdateExchangeMinDeposit)
+	self.r.POST("/update-deposit-address", self.UpdateDepositAddress)
+	self.r.POST("/update-exchange-info", self.UpdateExchangeInfo)
+
 	if self.core != nil && self.app != nil {
 		v2 := self.r.Group("/v2")
 

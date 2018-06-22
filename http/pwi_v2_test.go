@@ -2,6 +2,7 @@ package http
 
 import (
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -165,17 +166,27 @@ func TestHTTPServerPWIEquationV2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tokenStorage, err := settingsstorage.NewBoltTokenStorage(filepath.Join(tmpDir, "token.db"))
+	boltSettingStorage, err := settingsstorage.NewBoltSettingStorage(filepath.Join(tmpDir, "setting.db"))
 	if err != nil {
-		t.Fatal(err)
+		log.Fatal(err)
+	}
+	tokenSetting, err := settings.NewTokenSetting(boltSettingStorage)
+	if err != nil {
+		log.Fatal(err)
+	}
+	addressSetting, err := settings.NewAddressSetting(boltSettingStorage)
+	if err != nil {
+		log.Fatal(err)
+	}
+	exchangeSetting, err := settings.NewExchangeSetting(boltSettingStorage)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	addressStorage, err := settingsstorage.NewBoltAddressStorage(filepath.Join(tmpDir, "address.db"))
+	setting, err := settings.NewSetting(tokenSetting, addressSetting, exchangeSetting)
 	if err != nil {
-		t.Fatal(err)
+		log.Fatal(err)
 	}
-
-	setting := settings.NewSetting(tokenStorage, addressStorage)
 	err = setting.UpdateToken(common.Token{
 		ID:       "EOS",
 		Address:  "xxx",

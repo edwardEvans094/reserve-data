@@ -38,19 +38,20 @@ func (self testExchange) MarshalText() (text []byte, err error) {
 func (self testExchange) GetExchangeInfo(pair common.TokenPairID) (common.ExchangePrecisionLimit, error) {
 	return common.ExchangePrecisionLimit{}, nil
 }
-func (self testExchange) GetFee() common.ExchangeFees {
-	return common.ExchangeFees{}
+func (self testExchange) GetFee() (common.ExchangeFees, error) {
+	return common.ExchangeFees{}, nil
 }
-func (self testExchange) GetMinDeposit() common.ExchangesMinDeposit {
-	return common.ExchangesMinDeposit{}
+func (self testExchange) GetMinDeposit() (common.ExchangesMinDeposit, error) {
+	return common.ExchangesMinDeposit{}, nil
 }
-func (self testExchange) GetInfo() (*common.ExchangeInfo, error) {
-	return &common.ExchangeInfo{}, nil
+func (self testExchange) GetInfo() (common.ExchangeInfo, error) {
+	return common.ExchangeInfo{}, nil
 }
-func (self testExchange) TokenAddresses() map[string]ethereum.Address {
-	return map[string]ethereum.Address{}
+func (self testExchange) TokenAddresses() (map[string]ethereum.Address, error) {
+	return map[string]ethereum.Address{}, nil
 }
-func (self testExchange) UpdateDepositAddress(token common.Token, address string) {
+func (self testExchange) UpdateDepositAddress(token common.Token, address string) error {
+	return nil
 }
 
 func (self testExchange) GetTradeHistory(fromTime, toTime uint64) (common.ExchangeTradeHistory, error) {
@@ -140,19 +141,27 @@ func getTestCore(hasPendingDeposit bool) *ReserveCore {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	tokenStorage, err := storage.NewBoltTokenStorage(filepath.Join(tmpDir, "token.db"))
+	boltSettingStorage, err := storage.NewBoltSettingStorage(filepath.Join(tmpDir, "setting.db"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	tokenSetting, err := settings.NewTokenSetting(boltSettingStorage)
+	if err != nil {
+		log.Fatal(err)
+	}
+	addressSetting, err := settings.NewAddressSetting(boltSettingStorage)
+	if err != nil {
+		log.Fatal(err)
+	}
+	exchangeSetting, err := settings.NewExchangeSetting(boltSettingStorage)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	addressStorage, err := storage.NewBoltAddressStorage(filepath.Join(tmpDir, "address.db"))
+	setting, err := settings.NewSetting(tokenSetting, addressSetting, exchangeSetting)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	setting := settings.NewSetting(tokenStorage, addressStorage)
-
 	return NewReserveCore(
 		testBlockchain{},
 		testActivityStorage{hasPendingDeposit},

@@ -45,11 +45,6 @@ func serverStart(_ *cobra.Command, _ []string) {
 	var rCore reserve.ReserveCore
 	var rStat reserve.ReserveStats
 
-	//set static field supportExchange from common...
-	for _, ex := range config.Exchanges {
-		common.SupportedExchanges[ex.ID()] = ex
-	}
-
 	//Create blockchain object
 	bc, err := CreateBlockchain(config, kyberENV)
 	if err != nil {
@@ -69,6 +64,11 @@ func serverStart(_ *cobra.Command, _ []string) {
 				log.Panic(err)
 			}
 		}
+	}
+
+	//set static field supportExchange from common...
+	for _, ex := range config.Exchanges {
+		common.SupportedExchanges[ex.ID()] = ex
 	}
 
 	//Create Stat, run if not in dry mode

@@ -1,10 +1,8 @@
 package settings
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 
 	"github.com/KyberNetwork/reserve-data/common"
@@ -67,7 +65,7 @@ func (setting *Settings) ETHToken() common.Token {
 	return eth
 }
 
-func (setting *Settings) NewTokenPair(base, quote string) (common.TokenPair, error) {
+func (setting *Settings) NewTokenPairFromID(base, quote string) (common.TokenPair, error) {
 	bToken, err1 := setting.GetInternalTokenByID(base)
 	qToken, err2 := setting.GetInternalTokenByID(quote)
 	if err1 != nil || err2 != nil {
@@ -78,7 +76,7 @@ func (setting *Settings) NewTokenPair(base, quote string) (common.TokenPair, err
 }
 
 func (setting *Settings) MustCreateTokenPair(base, quote string) common.TokenPair {
-	pair, err := setting.NewTokenPair(base, quote)
+	pair, err := setting.NewTokenPairFromID(base, quote)
 	if err != nil {
 		panic(err)
 	}
@@ -87,22 +85,4 @@ func (setting *Settings) MustCreateTokenPair(base, quote string) common.TokenPai
 
 func (setting *Settings) UpdateToken(t common.Token) error {
 	return setting.Tokens.Storage.UpdateToken(t)
-}
-
-func (setting *Settings) LoadTokenFromFile(filePath string) error {
-	data, err := ioutil.ReadFile(filePath)
-	tokens := TokenConfig{}
-	if err != nil {
-		return err
-	}
-	if err = json.Unmarshal(data, &tokens); err != nil {
-		return err
-	}
-	for id, t := range tokens.Tokens {
-		token := common.NewToken(id, t.Name, t.Address, t.Decimal, t.Active, t.Internal, t.MinimalRecordResolution, t.MaxPerBlockImbalance, t.MaxTotalImbalance)
-		if err = setting.UpdateToken(token); err != nil {
-			return err
-		}
-	}
-	return nil
 }

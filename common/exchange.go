@@ -10,17 +10,19 @@ import (
 // Exchange represents a centralized exchange like Binance, Huobi...
 type Exchange interface {
 	ID() ExchangeID
+	// Address return the deposit address of a token and return true if token is supported in the exchange.
+	// Otherwise return false. This function will prioritize live address from exchange above the current stored address.
 	Address(token Token) (address ethereum.Address, supported bool)
-	UpdateDepositAddress(token Token, addr string)
+	UpdateDepositAddress(token Token, addr string) error
 	Withdraw(token Token, amount *big.Int, address ethereum.Address, timepoint uint64) (string, error)
 	Trade(tradeType string, base, quote Token, rate, amount float64, timepoint uint64) (id string, done, remaining float64, finished bool, err error)
 	CancelOrder(id, base, quote string) error
 	MarshalText() (text []byte, err error)
-	GetInfo() (*ExchangeInfo, error)
+	GetInfo() (ExchangeInfo, error)
 	GetExchangeInfo(TokenPairID) (ExchangePrecisionLimit, error)
-	GetFee() ExchangeFees
-	GetMinDeposit() ExchangesMinDeposit
-	TokenAddresses() map[string]ethereum.Address
+	GetFee() (ExchangeFees, error)
+	GetMinDeposit() (ExchangesMinDeposit, error)
+	TokenAddresses() (map[string]ethereum.Address, error)
 	GetTradeHistory(fromTime, toTime uint64) (ExchangeTradeHistory, error)
 }
 

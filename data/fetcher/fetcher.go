@@ -50,7 +50,7 @@ func (self *Fetcher) SetBlockchain(blockchain Blockchain) {
 func (self *Fetcher) AddExchange(exchange Exchange) {
 	self.exchanges = append(self.exchanges, exchange)
 	// initiate exchange status as up
-	exchangeStatus, _ := self.storage.GetExchangeStatus()
+	exchangeStatus, _ := self.setting.GetExchangeStatus()
 	if exchangeStatus == nil {
 		exchangeStatus = map[string]common.ExStatus{}
 	}
@@ -62,7 +62,7 @@ func (self *Fetcher) AddExchange(exchange Exchange) {
 			Status:    true,
 		}
 	}
-	if err := self.storage.UpdateExchangeStatus(exchangeStatus); err != nil {
+	if err := self.setting.UpdateExchangeStatus(exchangeStatus); err != nil {
 		log.Printf("Update exchange status error: %s", err.Error())
 	}
 }

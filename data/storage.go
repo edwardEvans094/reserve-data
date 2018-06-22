@@ -23,10 +23,4 @@ type Storage interface {
 
 	GetAllRecords(fromTime, toTime uint64) ([]common.ActivityRecord, error)
 	GetPendingActivities() ([]common.ActivityRecord, error)
-
-	GetExchangeStatus() (common.ExchangesStatus, error)
-	UpdateExchangeStatus(data common.ExchangesStatus) error
-
-	UpdateExchangeNotification(exchange, action, tokenPair string, fromTime, toTime uint64, isWarning bool, msg string) error
-	GetExchangeNotifications() (common.ExchangeNotifications, error)
 }

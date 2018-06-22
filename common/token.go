@@ -37,6 +37,10 @@ type TokenPair struct {
 	Quote Token
 }
 
+func NewTokenPair(base, quote Token) TokenPair {
+	return TokenPair{base, quote}
+}
+
 func (self *TokenPair) PairID() TokenPairID {
 	return NewTokenPairID(self.Base.ID, self.Quote.ID)
 }

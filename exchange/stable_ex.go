@@ -4,24 +4,23 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/KyberNetwork/reserve-data/common"
+	"github.com/KyberNetwork/reserve-data/settings"
 	ethereum "github.com/ethereum/go-ethereum/common"
 )
 
 type StableEx struct {
-	pairs        []common.TokenPair
-	exchangeInfo *common.ExchangeInfo
-	fees         common.ExchangeFees
-	mindeposit   common.ExchangesMinDeposit
+	setting Setting
 }
 
-func (self *StableEx) TokenAddresses() map[string]ethereum.Address {
+func (self *StableEx) TokenAddresses() (map[string]ethereum.Address, error) {
 	// returning admin multisig. In case anyone sent dgx to this address,
 	// we can still get it.
 	return map[string]ethereum.Address{
 		"DGX": ethereum.HexToAddress("0xFDF28Bf25779ED4cA74e958d54653260af604C20"),
-	}
+	}, nil
 }
 
 func (self *StableEx) MarshalText() (text []byte, err error) {
@@ -29,7 +28,11 @@ func (self *StableEx) MarshalText() (text []byte, err error) {
 }
 
 func (self *StableEx) Address(token common.Token) (ethereum.Address, bool) {
-	addr, supported := self.TokenAddresses()[token.ID]
+	addrs, err := self.TokenAddresses()
+	if err != nil {
+		return ethereum.Address{}, false
+	}
+	addr, supported := addrs[token.ID]
 	return addr, supported
 }
 
@@ -37,25 +40,58 @@ func (self *StableEx) UpdateAllDepositAddresses(address string) {
 	panic("dgx doesn't support update deposit addresses")
 }
 
-func (self *StableEx) UpdateDepositAddress(token common.Token, address string) {
+func (self *StableEx) UpdateDepositAddress(token common.Token, address string) error {
 	panic("dgx doesn't support update deposit addresses")
 }
 
-func (self *StableEx) GetInfo() (*common.ExchangeInfo, error) {
-	return self.exchangeInfo, nil
+func (self *StableEx) GetInfo() (common.ExchangeInfo, error) {
+	return self.setting.GetExchangeInfo(settings.StableExchange)
 }
 
 func (self *StableEx) GetExchangeInfo(pair common.TokenPairID) (common.ExchangePrecisionLimit, error) {
-	data, err := self.exchangeInfo.Get(pair)
+	exInfo, err := self.setting.GetExchangeInfo(settings.StableExchange)
+	if err != nil {
+		return common.ExchangePrecisionLimit{}, err
+	}
+	data, err := exInfo.Get(pair)
 	return data, err
 }
 
-func (self *StableEx) GetFee() common.ExchangeFees {
-	return self.fees
+func (self *StableEx) GetFee() (common.ExchangeFees, error) {
+	return self.setting.GetFee(settings.StableExchange)
 }
 
+// ID must return the exact string or else simulation will fail
 func (self *StableEx) ID() common.ExchangeID {
-	return common.ExchangeID("stable_exchange")
+	return common.ExchangeID(settings.StableExchange.String())
+}
+
+func (self *StableEx) TokenPairs() ([]common.TokenPair, error) {
+	result := []common.TokenPair{}
+	exInfo, err := self.setting.GetExchangeInfo(settings.StableExchange)
+	if err != nil {
+		return nil, err
+	}
+	for pair := range exInfo.GetData() {
+		pairIDs := strings.Split(string(pair), "-")
+		if len(pairIDs) != 2 {
+			return result, fmt.Errorf("PairID %s is malformed", string(pair))
+		}
+		tok1, uErr := self.setting.GetTokenByID(pairIDs[0])
+		if uErr != nil {
+			return result, fmt.Errorf("cant get Token %s, %s", pairIDs[0], uErr)
+		}
+		tok2, uErr := self.setting.GetTokenByID(pairIDs[1])
+		if uErr != nil {
+			return result, fmt.Errorf("cant get Token %s, %s", pairIDs[1], uErr)
+		}
+		tokPair := common.TokenPair{
+			Base:  tok1,
+			Quote: tok2,
+		}
+		result = append(result, tokPair)
+	}
+	return result, nil
 }
 
 func (self *StableEx) Name() string {
@@ -128,16 +164,12 @@ func (self *StableEx) OrderStatus(id string, base, quote string) (string, error)
 	return "", errors.New("not supported")
 }
 
-func (self *StableEx) GetMinDeposit() common.ExchangesMinDeposit {
-	return self.mindeposit
+func (self *StableEx) GetMinDeposit() (common.ExchangesMinDeposit, error) {
+	return self.setting.GetMinDeposit(settings.StableExchange)
 }
 
-func NewStableEx(addressConfig map[string]string, feeConfig common.ExchangeFees, minDepositConfig common.ExchangesMinDeposit, setting Setting) *StableEx {
-	_, pairs, fees, mindeposit := getExchangePairsAndFeesFromConfig(addressConfig, feeConfig, minDepositConfig, "stable_exchange", setting)
+func NewStableEx(setting Setting) (*StableEx, error) {
 	return &StableEx{
-		pairs,
-		common.NewExchangeInfo(),
-		fees,
-		mindeposit,
-	}
+		setting,
+	}, nil
 }

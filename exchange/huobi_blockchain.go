@@ -12,4 +12,5 @@ type HuobiBlockchain interface {
 	SendETHFromAccountToExchange(amount *big.Int, exchangeAddress ethereum.Address) (*types.Transaction, error)
 	SendTokenFromAccountToExchange(amount *big.Int, exchangeAddress ethereum.Address, tokenAddress ethereum.Address) (*types.Transaction, error)
 	TxStatus(hash ethereum.Hash) (string, uint64, error)
+	GetIntermediatorAddr() ethereum.Address
 }

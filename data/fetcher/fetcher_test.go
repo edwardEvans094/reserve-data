@@ -2,7 +2,6 @@ package fetcher
 
 import (
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -13,7 +12,7 @@ import (
 	"github.com/KyberNetwork/reserve-data/data/fetcher/http_runner"
 	"github.com/KyberNetwork/reserve-data/data/storage"
 	"github.com/KyberNetwork/reserve-data/settings"
-	settingsstorage "github.com/KyberNetwork/reserve-data/settings/storage"
+	settingstorage "github.com/KyberNetwork/reserve-data/settings/storage"
 	"github.com/KyberNetwork/reserve-data/world"
 )
 
@@ -91,7 +90,7 @@ func TestExchangeDown(t *testing.T) {
 
 	fstorage, err := storage.NewBoltStorage(testFetcherStoragePath)
 	if err != nil {
-		log.Fatal(err.Error())
+		t.Fatal(err.Error())
 	}
 	defer func() {
 		if rErr := os.RemoveAll(tmpDir); rErr != nil {
@@ -102,18 +101,27 @@ func TestExchangeDown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	tokenStorage, err := settingsstorage.NewBoltTokenStorage(filepath.Join(tmpDir, "token.db"))
+	boltSettingStorage, err := settingstorage.NewBoltSettingStorage(filepath.Join(tmpDir, "setting.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokenSetting, err := settings.NewTokenSetting(boltSettingStorage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addressSetting, err := settings.NewAddressSetting(boltSettingStorage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exchangeSetting, err := settings.NewExchangeSetting(boltSettingStorage)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	addressStorage, err := settingsstorage.NewBoltAddressStorage(filepath.Join(tmpDir, "address.db"))
+	setting, err := settings.NewSetting(tokenSetting, addressSetting, exchangeSetting)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	setting := settings.NewSetting(tokenStorage, addressStorage)
 	fetcher := NewFetcher(fstorage, fstorage, &world.TheWorld{}, runner, true, setting)
 
 	// mock normal data

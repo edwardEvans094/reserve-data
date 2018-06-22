@@ -33,8 +33,6 @@ const (
 	PENDING_PWI_EQUATION               string = "pending_pwi_equation"
 	PWI_EQUATION                       string = "pwi_equation"
 	INTERMEDIATE_TX                    string = "intermediate_tx"
-	EXCHANGE_STATUS                    string = "exchange_status"
-	EXCHANGE_NOTIFICATIONS             string = "exchange_notifications"
 	MAX_NUMBER_VERSION                 int    = 1000
 	MAX_GET_RATES_PERIOD               uint64 = 86400000      //1 days in milisec
 	AUTH_DATA_EXPIRED_DURATION         uint64 = 10 * 86400000 //10day in milisec
@@ -117,12 +115,6 @@ func NewBoltStorage(path string) (*BoltStorage, error) {
 			return cErr
 		}
 		if _, cErr := tx.CreateBucketIfNotExists([]byte(INTERMEDIATE_TX)); cErr != nil {
-			return cErr
-		}
-		if _, cErr := tx.CreateBucketIfNotExists([]byte(EXCHANGE_STATUS)); cErr != nil {
-			return cErr
-		}
-		if _, cErr := tx.CreateBucketIfNotExists([]byte(EXCHANGE_NOTIFICATIONS)); cErr != nil {
 			return cErr
 		}
 		if _, cErr := tx.CreateBucketIfNotExists([]byte(PENDING_STABLE_TOKEN_PARAMS_BUCKET)); cErr != nil {
@@ -1200,108 +1192,6 @@ func (self *BoltStorage) RemovePendingPWIEquation() error {
 		return err
 	})
 	return err
-}
-
-// GetExchangeStatus get exchange status to dashboard and analytics
-func (self *BoltStorage) GetExchangeStatus() (common.ExchangesStatus, error) {
-	result := make(common.ExchangesStatus)
-	var err error
-	err = self.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(EXCHANGE_STATUS))
-		c := b.Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			var exstat common.ExStatus
-			if _, vErr := common.GetExchange(strings.ToLower(string(k))); vErr != nil {
-				continue
-			}
-			if vErr := json.Unmarshal(v, &exstat); vErr != nil {
-				return vErr
-			}
-			result[string(k)] = exstat
-		}
-		return nil
-	})
-	return result, err
-}
-
-func (self *BoltStorage) UpdateExchangeStatus(data common.ExchangesStatus) error {
-	var err error
-	err = self.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(EXCHANGE_STATUS))
-		for k, v := range data {
-			dataJSON, uErr := json.Marshal(v)
-			if uErr != nil {
-				return uErr
-			}
-			if uErr := b.Put([]byte(k), dataJSON); uErr != nil {
-				return uErr
-			}
-		}
-		return nil
-	})
-	return err
-}
-
-func (self *BoltStorage) UpdateExchangeNotification(
-	exchange, action, token string, fromTime, toTime uint64, isWarning bool, msg string) error {
-	var err error
-	err = self.db.Update(func(tx *bolt.Tx) error {
-		exchangeBk := tx.Bucket([]byte(EXCHANGE_NOTIFICATIONS))
-		b, uErr := exchangeBk.CreateBucketIfNotExists([]byte(exchange))
-		if uErr != nil {
-			return uErr
-		}
-		key := fmt.Sprintf("%s_%s", action, token)
-		noti := common.ExchangeNotiContent{
-			FromTime:  fromTime,
-			ToTime:    toTime,
-			IsWarning: isWarning,
-			Message:   msg,
-		}
-
-		// update new value
-		dataJSON, uErr := json.Marshal(noti)
-		if uErr != nil {
-			return uErr
-		}
-		return b.Put([]byte(key), dataJSON)
-	})
-	return err
-}
-
-func (self *BoltStorage) GetExchangeNotifications() (common.ExchangeNotifications, error) {
-	result := common.ExchangeNotifications{}
-	var err error
-	err = self.db.View(func(tx *bolt.Tx) error {
-		exchangeBks := tx.Bucket([]byte(EXCHANGE_NOTIFICATIONS))
-		c := exchangeBks.Cursor()
-		for name, bucket := c.First(); name != nil; name, bucket = c.Next() {
-			// if bucket == nil, then name is a child bucket name (according to bolt docs)
-			if bucket == nil {
-				b := exchangeBks.Bucket(name)
-				c := b.Cursor()
-				actionContent := common.ExchangeActionNoti{}
-				for k, v := c.First(); k != nil; k, v = c.Next() {
-					actionToken := strings.Split(string(k), "_")
-					action := actionToken[0]
-					token := actionToken[1]
-					notiContent := common.ExchangeNotiContent{}
-					if uErr := json.Unmarshal(v, &notiContent); uErr != nil {
-						return uErr
-					}
-					tokenContent, exist := actionContent[action]
-					if !exist {
-						tokenContent = common.ExchangeTokenNoti{}
-					}
-					tokenContent[token] = notiContent
-					actionContent[action] = tokenContent
-				}
-				result[string(name)] = actionContent
-			}
-		}
-		return nil
-	})
-	return result, err
 }
 
 func (self *BoltStorage) SetStableTokenParams(value []byte) error {

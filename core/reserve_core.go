@@ -160,6 +160,7 @@ func (self ReserveCore) Deposit(
 			"Core ----------> Deposit to %s: token: %s, amount: %s, timestamp: %d ==> Result: tx: %s, error: %s",
 			exchange.ID(), token.ID, amount.Text(10), timepoint, txhex, err,
 		)
+
 		return self.activityStorage.Record(
 			"deposit",
 			uid,
@@ -449,8 +450,8 @@ func sanityCheck(buys, afpMid, sells []*big.Int) error {
 }
 
 func sanityCheckTrading(exchange common.Exchange, base, quote common.Token, rate, amount float64) error {
-	tokenPairID := makeTokenPair(base.ID, quote.ID)
-	exchangeInfo, err := exchange.GetExchangeInfo(tokenPairID)
+	tokenPair := makeTokenPair(base, quote)
+	exchangeInfo, err := exchange.GetExchangeInfo(tokenPair.PairID())
 	if err != nil {
 		return err
 	}
@@ -465,7 +466,10 @@ func sanityCheckTrading(exchange common.Exchange, base, quote common.Token, rate
 }
 
 func sanityCheckAmount(exchange common.Exchange, token common.Token, amount *big.Int) error {
-	exchangeFee := exchange.GetFee()
+	exchangeFee, err := exchange.GetFee()
+	if err != nil {
+		return err
+	}
 	amountFloat := big.NewFloat(0).SetInt(amount)
 	feeWithdrawing := exchangeFee.Funding.GetTokenFee(string(token.ID))
 	expDecimal := big.NewInt(0).Exp(big.NewInt(10), big.NewInt(token.Decimal), nil)
@@ -495,9 +499,9 @@ func checkZeroValue(buy, sell *big.Int) int {
 	return -1
 }
 
-func makeTokenPair(base, quote string) common.TokenPairID {
-	if base == "ETH" {
-		return common.NewTokenPairID(quote, base)
+func makeTokenPair(base, quote common.Token) common.TokenPair {
+	if base.ID == "ETH" {
+		return common.NewTokenPair(quote, base)
 	}
-	return common.NewTokenPairID(base, quote)
+	return common.NewTokenPair(base, quote)
 }

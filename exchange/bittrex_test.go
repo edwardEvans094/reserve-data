@@ -3,10 +3,15 @@ package exchange
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"math/big"
+	"path/filepath"
 	"testing"
 
 	"github.com/KyberNetwork/reserve-data/common"
+	"github.com/KyberNetwork/reserve-data/settings"
+	"github.com/KyberNetwork/reserve-data/settings/storage"
 	ethereum "github.com/ethereum/go-ethereum/common"
 )
 
@@ -82,16 +87,35 @@ func (self *testBittrexStorage) GetTradeHistory(fromTime, toTime uint64) (common
 }
 
 func getTestBittrex(depositHistory string, registered bool) *Bittrex {
+	tmpDir, err := ioutil.TempDir("", "bittrex_test")
+	if err != nil {
+		log.Fatal(err)
+	}
+	boltSettingStorage, err := storage.NewBoltSettingStorage(filepath.Join(tmpDir, "setting.db"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	tokenSetting, err := settings.NewTokenSetting(boltSettingStorage)
+	if err != nil {
+		log.Fatal(err)
+	}
+	addressSetting, err := settings.NewAddressSetting(boltSettingStorage)
+	if err != nil {
+		log.Fatal(err)
+	}
+	exchangeSetting, err := settings.NewExchangeSetting(boltSettingStorage)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	setting, err := settings.NewSetting(tokenSetting, addressSetting, exchangeSetting)
+	if err != nil {
+		log.Fatal(err)
+	}
 	return &Bittrex{
 		testBittrexInterface{depositHistory},
-		[]common.TokenPair{},
-		[]common.Token{},
-		common.NewExchangeAddresses(),
 		&testBittrexStorage{registered},
-		&common.ExchangeInfo{},
-		common.ExchangeFees{},
-		common.ExchangesMinDeposit{},
-		nil,
+		setting,
 	}
 }
 

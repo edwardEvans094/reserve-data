@@ -9,24 +9,15 @@ import (
 	"github.com/KyberNetwork/reserve-data/common/blockchain"
 	"github.com/KyberNetwork/reserve-data/http"
 	"github.com/KyberNetwork/reserve-data/settings"
-	"github.com/KyberNetwork/reserve-data/settings/storage"
+	settingstorage "github.com/KyberNetwork/reserve-data/settings/storage"
 	"github.com/KyberNetwork/reserve-data/world"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
 const (
-	tokenDBFileName   string = "token.db"
-	addressDBFileName string = "address.db"
+	settingDBFileName string = "setting.db"
 )
-
-func GetAddressConfig(filePath string) common.AddressConfig {
-	addressConfig, err := common.GetAddressConfigFromFile(filePath)
-	if err != nil {
-		log.Fatalf("Config file %s is not found. Check that KYBER_ENV is set correctly. Error: %s", filePath, err)
-	}
-	return addressConfig
-}
 
 func GetChainType(kyberENV string) string {
 	switch kyberENV {
@@ -60,29 +51,48 @@ func GetConfigPaths(kyberENV string) SettingPaths {
 	return ConfigPaths[common.DEV_MODE]
 }
 
+func GetSetting(setPath SettingPaths) (*settings.Settings, error) {
+	boltSettingStorage, err := settingstorage.NewBoltSettingStorage(filepath.Join(common.CmdDirLocation(), settingDBFileName))
+	if err != nil {
+		return nil, err
+	}
+	tokenSetting, err := settings.NewTokenSetting(boltSettingStorage)
+	if err != nil {
+		return nil, err
+	}
+	addressSetting, err := settings.NewAddressSetting(boltSettingStorage)
+	if err != nil {
+		return nil, err
+	}
+	exchangeSetting, err := settings.NewExchangeSetting(boltSettingStorage)
+	if err != nil {
+		return nil, err
+	}
+	setting, err := settings.NewSetting(
+		tokenSetting,
+		addressSetting,
+		exchangeSetting,
+		settings.WithHandleEmptyToken(setPath.settingPath),
+		settings.WithHandleEmptyAddress(setPath.settingPath),
+		settings.WithHandleEmptyFee(setPath.feePath),
+		settings.WithHandleEmptyMinDeposit(filepath.Join(common.CmdDirLocation(), "min_deposit.json")),
+		settings.WithHandleEmptyDepositAddress(setPath.settingPath),
+		settings.WithHandleEmptyExchangeInfo())
+	return setting, err
+}
+
 func GetConfig(kyberENV string, authEnbl bool, endpointOW string, noCore, enableStat bool) *Config {
 	setPath := GetConfigPaths(kyberENV)
-
 	world, err := world.NewTheWorld(kyberENV, setPath.secretPath)
 	if err != nil {
 		panic("Can't init the world (which is used to get global data), err " + err.Error())
 	}
-	tokenStorage, err := storage.NewBoltTokenStorage(filepath.Join(common.CmdDirLocation(), tokenDBFileName))
-	if err != nil {
-		log.Panicf("failed to create token storage: %s", err.Error())
-	}
-	addressStorage, err := storage.NewBoltAddressStorage(filepath.Join(common.CmdDirLocation(), addressDBFileName))
-	if err != nil {
-		log.Panicf("failed to create address storage: %s", err.Error())
-	}
-	setting := settings.NewSetting(
-		tokenStorage,
-		addressStorage,
-		settings.WithHandleEmptyToken(setPath.settingPath),
-		settings.WithHandleEmptyAddress(setPath.settingPath))
-	addressConfig := GetAddressConfig(setPath.settingPath)
-	hmac512auth := http.NewKNAuthenticationFromFile(setPath.secretPath)
 
+	hmac512auth := http.NewKNAuthenticationFromFile(setPath.secretPath)
+	setting, err := GetSetting(setPath)
+	if err != nil {
+		log.Panicf("Failed to create setting: %s", err.Error())
+	}
 	var endpoint string
 	if endpointOW != "" {
 		log.Printf("overwriting Endpoint with %s\n", endpointOW)
@@ -144,9 +154,8 @@ func GetConfig(kyberENV string, authEnbl bool, endpointOW string, noCore, enable
 	if enableStat {
 		config.AddStatConfig(setPath)
 	}
-	//TODO : remove addressconfig, add exchange to setting
 	if !noCore {
-		config.AddCoreConfig(setPath, addressConfig, kyberENV)
+		config.AddCoreConfig(setPath, kyberENV)
 	}
 	return config
 }

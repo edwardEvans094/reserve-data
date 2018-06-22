@@ -14,6 +14,10 @@ type Blockchain struct {
 	*blockchain.BaseBlockchain
 }
 
+func (self *Blockchain) GetIntermediatorAddr() ethereum.Address {
+	return self.OperatorAddresses()[HUOBI_OP]
+}
+
 func (self *Blockchain) SendTokenFromAccountToExchange(amount *big.Int, exchangeAddress ethereum.Address, tokenAddress ethereum.Address) (*types.Transaction, error) {
 	opts, err := self.GetTxOpts(HUOBI_OP, nil, nil, nil)
 	if err != nil {
@@ -45,7 +49,6 @@ func NewBlockchain(
 	signer blockchain.Signer, nonce blockchain.NonceCorpus) (*Blockchain, error) {
 
 	base.RegisterOperator(HUOBI_OP, blockchain.NewOperator(signer, nonce))
-
 	return &Blockchain{
 		BaseBlockchain: base,
 	}, nil

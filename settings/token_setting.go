@@ -1,5 +1,12 @@
 package settings
 
+import (
+	"encoding/json"
+	"io/ioutil"
+
+	"github.com/KyberNetwork/reserve-data/common"
+)
+
 type token struct {
 	Address                 string `json:"address"`
 	Name                    string `json:"name"`
@@ -19,7 +26,25 @@ type TokenSetting struct {
 	Storage TokenStorage
 }
 
-func NewTokenSetting(storage TokenStorage) *TokenSetting {
-	return &TokenSetting{Storage: storage}
+func NewTokenSetting(tokenStorage TokenStorage) (*TokenSetting, error) {
+	tokenSetting := TokenSetting{tokenStorage}
+	return &tokenSetting, nil
 
+}
+func (setting *Settings) loadTokenFromFile(filePath string) error {
+	data, err := ioutil.ReadFile(filePath)
+	tokens := TokenConfig{}
+	if err != nil {
+		return err
+	}
+	if err = json.Unmarshal(data, &tokens); err != nil {
+		return err
+	}
+	for id, t := range tokens.Tokens {
+		token := common.NewToken(id, t.Name, t.Address, t.Decimal, t.Active, t.Internal, t.MinimalRecordResolution, t.MaxPerBlockImbalance, t.MaxTotalImbalance)
+		if err = setting.UpdateToken(token); err != nil {
+			return err
+		}
+	}
+	return nil
 }

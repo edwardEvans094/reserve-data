@@ -12,6 +12,7 @@ import (
 
 	"github.com/KyberNetwork/reserve-data/common"
 	"github.com/KyberNetwork/reserve-data/common/blockchain"
+	hbblockchain "github.com/KyberNetwork/reserve-data/exchange/huobi/blockchain"
 	"github.com/KyberNetwork/reserve-data/settings"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	ethereum "github.com/ethereum/go-ethereum/common"
@@ -93,7 +94,12 @@ func (self *Blockchain) AddOldBurners(addr ethereum.Address) error {
 func (self *Blockchain) GetAddresses() (*common.Addresses, error) {
 	exs := map[common.ExchangeID]common.TokenAddresses{}
 	for _, ex := range common.SupportedExchanges {
-		exs[ex.ID()] = ex.TokenAddresses()
+		addrs, err := ex.TokenAddresses()
+		if err != nil {
+			return nil, fmt.Errorf("ERROR: Can't not get deposit addresss of exchange %s :(%s)", ex.ID(), err.Error())
+		}
+		exs[ex.ID()] = addrs
+
 	}
 	tokens := map[string]common.TokenInfo{}
 	tokenSettings, err := self.setting.GetInternalTokens()
@@ -127,17 +133,18 @@ func (self *Blockchain) GetAddresses() (*common.Addresses, error) {
 		return nil, err
 	}
 	opAddrs := self.OperatorAddresses()
-	return &common.Addresses{
-		Tokens:           tokens,
-		Exchanges:        exs,
-		WrapperAddress:   wrapperAddr,
-		PricingAddress:   pricingAddr,
-		ReserveAddress:   reserveAddr,
-		FeeBurnerAddress: burnerAddr,
-		NetworkAddress:   networkAddr,
-		PricingOperator:  opAddrs[PRICING_OP],
-		DepositOperator:  opAddrs[DEPOSIT_OP],
-	}, nil
+	return common.NewAddresses(
+		tokens,
+		exs,
+		wrapperAddr,
+		pricingAddr,
+		reserveAddr,
+		burnerAddr,
+		networkAddr,
+		opAddrs[PRICING_OP],
+		opAddrs[DEPOSIT_OP],
+		opAddrs[hbblockchain.HUOBI_OP],
+	), nil
 }
 
 func (self *Blockchain) LoadAndSetTokenIndices(tokenAddrs []ethereum.Address) error {

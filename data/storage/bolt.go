@@ -645,6 +645,22 @@ func (self *BoltStorage) GetAllRecords(fromTime, toTime uint64) ([]common.Activi
 	return result, err
 }
 
+// interfaceConverstionToUint64 will assert the interface as string
+// and parse it to uint64. Return 0 if anything goes wrong)
+func interfaceConverstionToUint64(intf interface{}) uint64 {
+	numString, ok := intf.(string)
+	if !ok {
+		log.Printf("(%v) can't be converted to type string", intf)
+		return 0
+	}
+	num, err := strconv.ParseUint(numString, 10, 64)
+	if err != nil {
+		log.Printf("ERROR: parsing error %s, inteface conversion to uint64 will set to 0", err)
+		return 0
+	}
+	return num
+}
+
 func getLastAndCountPendingSetrate(pendings []common.ActivityRecord, minedNonce uint64) (*common.ActivityRecord, uint64, error) {
 	var maxNonce uint64
 	var maxPrice uint64
@@ -653,24 +669,12 @@ func getLastAndCountPendingSetrate(pendings []common.ActivityRecord, minedNonce 
 	for i, act := range pendings {
 		if act.Action == "set_rates" {
 			log.Printf("looking for pending set_rates: %+v", act)
-			var nonce uint64
-			actNonce := act.Result["nonce"]
-			if actNonce != nil {
-				nonce, _ = strconv.ParseUint(actNonce.(string), 10, 64)
-			} else {
-				nonce = 0
-			}
+			nonce := interfaceConverstionToUint64(act.Result["nonce"])
 			if nonce < minedNonce {
 				// this is a stale actitivity, ignore it
 				continue
 			}
-			var gasPrice uint64
-			actPrice := act.Result["gasPrice"]
-			if actPrice != nil {
-				gasPrice, _ = strconv.ParseUint(actPrice.(string), 10, 64)
-			} else {
-				gasPrice = 0
-			}
+			gasPrice := interfaceConverstionToUint64(act.Result["gasPrice"])
 			if nonce == maxNonce {
 				if gasPrice > maxPrice {
 					maxNonce = nonce
@@ -779,8 +783,15 @@ func (self *BoltStorage) HasPendingDeposit(token common.Token, exchange common.E
 			if uErr := json.Unmarshal(v, &record); uErr != nil {
 				return uErr
 			}
-			if record.Action == "deposit" && record.Params["token"].(string) == token.ID && record.Destination == string(exchange.ID()) {
-				result = true
+			if record.Action == "deposit" {
+				tokenID, ok := record.Params["token"].(string)
+				if !ok {
+					log.Printf("ERROR: record Params token (%v) can not be converted to string", record.Params["token"])
+					continue
+				}
+				if tokenID == token.ID && record.Destination == string(exchange.ID()) {
+					result = true
+				}
 			}
 		}
 		return nil

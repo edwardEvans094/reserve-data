@@ -709,8 +709,17 @@ func (self *Fetcher) FetchReserveRates(timepoint uint64) {
 	}
 	wg.Wait()
 	data.Range(func(key, value interface{}) bool {
-		reserveAddr := key.(ethereum.Address)
-		rates := value.(common.ReserveRates)
+		reserveAddr, ok := key.(ethereum.Address)
+		//if there is conversion error, continue to next key,val
+		if !ok {
+			log.Printf("key (%v) cannot be asserted to ethereum.Address", key)
+			return true
+		}
+		rates, ok := value.(common.ReserveRates)
+		if !ok {
+			log.Printf("valuve (%v) cannot be asserted to reserveRates", value)
+			return true
+		}
 		log.Printf("Storing reserve rates to db...")
 		if err := self.rateStorage.StoreReserveRates(reserveAddr, rates, common.GetTimepoint()); err != nil {
 			log.Printf("Store reserve rates error: %s", err.Error())
@@ -880,15 +889,24 @@ func (self *Fetcher) FetchLogs(fromBlock uint64, toBlock uint64, timepoint uint6
 	if len(logs) > 0 {
 		var maxBlock = enforceFromBlock(fromBlock)
 		for _, il := range logs {
+			// If there is log conversion error, print error and continue to the next log
 			if il.Type() == "TradeLog" {
-				l := il.(common.TradeLog)
+				l, ok := il.(common.TradeLog)
+				if !ok {
+					log.Printf("LogFetcher: ERROR cannot convert log (%v) to tradelog", il)
+					continue
+				}
 				SetcountryFields(&l)
 				if dbErr := self.CheckDupAndStoreTradeLog(l, timepoint); dbErr != nil {
 					log.Printf("LogFetcher - at block %d, storing trade log failed, stop at current block and wait till next ticker, err: %+v", l.BlockNo(), err)
 					return maxBlock, dbErr
 				}
 			} else if il.Type() == "SetCatLog" {
-				l := il.(common.SetCatLog)
+				l, ok := il.(common.SetCatLog)
+				if !ok {
+					log.Printf("LogFetcher: ERROR cannot convert log (%v) to catlog", il)
+					continue
+				}
 				if dbErr := self.CheckDupAndStoreCatLog(l, timepoint); dbErr != nil {
 					log.Printf("LogFetcher - at block %d, storing cat log failed, stop at current block and wait till next ticker, err: %+v", l.BlockNo(), err)
 					return maxBlock, dbErr

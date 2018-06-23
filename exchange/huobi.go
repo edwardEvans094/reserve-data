@@ -314,10 +314,21 @@ func (self *Huobi) FetchPriceData(timepoint uint64) (map[common.TokenPairID]comm
 	wait.Wait()
 	result := map[common.TokenPairID]common.ExchangePrice{}
 	data.Range(func(key, value interface{}) bool {
-		result[key.(common.TokenPairID)] = value.(common.ExchangePrice)
+		tokenPairID, ok := key.(common.TokenPairID)
+		//if there is conversion error, continue to next key,val
+		if !ok {
+			err = fmt.Errorf("Key (%v) cannot be asserted to TokenPairID", key)
+			return false
+		}
+		exPrice, ok := value.(common.ExchangePrice)
+		if !ok {
+			err = fmt.Errorf("Value (%v) cannot be asserted to ExchangePrice", value)
+			return false
+		}
+		result[tokenPairID] = exPrice
 		return true
 	})
-	return result, nil
+	return result, err
 }
 
 func (self *Huobi) OpenOrdersForOnePair(
@@ -352,13 +363,16 @@ func (self *Huobi) FetchOrderData(timepoint uint64) (common.OrderEntry, error) {
 	wait.Wait()
 
 	result.ReturnTime = common.GetTimestamp()
-
 	data.Range(func(key, value interface{}) bool {
-		orders := value.([]common.Order)
+		orders, ok := value.([]common.Order)
+		if !ok {
+			err = fmt.Errorf("cannot convert value (%v) to Order", value)
+			return false
+		}
 		result.Data = append(result.Data, orders...)
 		return true
 	})
-	return result, nil
+	return result, err
 }
 
 func (self *Huobi) FetchEBalanceData(timepoint uint64) (common.EBalanceEntry, error) {
@@ -449,10 +463,28 @@ func (self *Huobi) FetchTradeHistory() {
 				go self.FetchOnePairTradeHistory(&wait, &data, pair)
 			}
 			wait.Wait()
+			var integrity bool = true
 			data.Range(func(key, value interface{}) bool {
-				result[key.(common.TokenPairID)] = value.([]common.TradeHistory)
+				tokenPairID, ok := key.(common.TokenPairID)
+				//if there is conversion error, continue to next key,val
+				if !ok {
+					log.Printf("Key (%v) cannot be asserted to TokenPairID", key)
+					integrity = false
+					return false
+				}
+				tradeHistories, ok := value.([]common.TradeHistory)
+				if !ok {
+					log.Printf("Value (%v) cannot be asserted to []TradeHistory", value)
+					integrity = false
+					return false
+				}
+				result[tokenPairID] = tradeHistories
 				return true
 			})
+			if !integrity {
+				log.Print("Huobi fetch trade history returns corrupted. Try again in 10 mins")
+				continue
+			}
 			if err := self.storage.StoreTradeHistory(result); err != nil {
 				log.Printf("Store trade history error: %s", err.Error())
 			}

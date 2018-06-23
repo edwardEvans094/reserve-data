@@ -222,8 +222,16 @@ func (self *Config) AddCoreConfig(settingPath SettingPaths, kyberENV string) {
 	if err != nil {
 		log.Panicf("Can not create exchangePool: %s", err.Error())
 	}
-	self.FetcherExchanges = exchangePool.FetcherExchanges()
-	self.Exchanges = exchangePool.CoreExchanges()
+	fetcherExchanges, err := exchangePool.FetcherExchanges()
+	if err != nil {
+		log.Panicf("cannot Create fetcher exchanges : (%s)", err.Error())
+	}
+	self.FetcherExchanges = fetcherExchanges
+	coreExchanges, err := exchangePool.CoreExchanges()
+	if err != nil {
+		log.Panicf("cannot Create core exchanges : (%s)", err.Error())
+	}
+	self.Exchanges = coreExchanges
 }
 
 var ConfigPaths = map[string]SettingPaths{

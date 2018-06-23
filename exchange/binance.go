@@ -315,10 +315,21 @@ func (self *Binance) FetchPriceData(timepoint uint64) (map[common.TokenPairID]co
 	}
 	result := map[common.TokenPairID]common.ExchangePrice{}
 	data.Range(func(key, value interface{}) bool {
-		result[key.(common.TokenPairID)] = value.(common.ExchangePrice)
+		//if there is conversion error, continue to next key,val
+		tokenPairID, ok := key.(common.TokenPairID)
+		if !ok {
+			err = fmt.Errorf("Key (%v) cannot be asserted to TokenPairID", key)
+			return false
+		}
+		exPrice, ok := value.(common.ExchangePrice)
+		if !ok {
+			err = fmt.Errorf("Value (%v) cannot be asserted to ExchangePrice", value)
+			return false
+		}
+		result[tokenPairID] = exPrice
 		return true
 	})
-	return result, nil
+	return result, err
 }
 
 func (self *Binance) OpenOrdersForOnePair(
@@ -455,10 +466,28 @@ func (self *Binance) FetchTradeHistory() {
 				i = x
 				wait.Wait()
 			}
+			var integrity bool = true
 			data.Range(func(key, value interface{}) bool {
-				result[key.(common.TokenPairID)] = value.([]common.TradeHistory)
+				tokenPairID, ok := key.(common.TokenPairID)
+				//if there is conversion error, continue to next key,val
+				if !ok {
+					log.Printf("Key (%v) cannot be asserted to TokenPairID", key)
+					integrity = false
+					return false
+				}
+				tradeHistories, ok := value.([]common.TradeHistory)
+				if !ok {
+					log.Printf("Value (%v) cannot be asserted to []TradeHistory", value)
+					integrity = false
+					return false
+				}
+				result[tokenPairID] = tradeHistories
 				return true
 			})
+			if !integrity {
+				log.Print("Binance fetch trade history returns corrupted. Try again in 10 mins")
+				continue
+			}
 			if err := self.storage.StoreTradeHistory(result); err != nil {
 				log.Printf("Binance Store trade history error: %s", err.Error())
 			}

@@ -53,8 +53,14 @@ func (self ReserveCore) CancelOrder(id common.ActivityID, exchange common.Exchan
 	if activity.Action != "trade" {
 		return errors.New("This is not an order activity so cannot cancel")
 	}
-	base := activity.Params["base"].(string)
-	quote := activity.Params["quote"].(string)
+	base, ok := activity.Params["base"].(string)
+	if !ok {
+		return fmt.Errorf("cannot convert params base (value: %v) to tokenID (type string)", activity.Params["base"])
+	}
+	quote, ok := activity.Params["quote"].(string)
+	if !ok {
+		return fmt.Errorf("cannot convert params quote (value: %v) to tokenID (type string)", activity.Params["quote"])
+	}
 	orderId := id.EID
 	return exchange.CancelOrder(orderId, base, quote)
 }
@@ -314,8 +320,24 @@ func (self ReserveCore) pendingSetrateInfo(minedNonce uint64) (*big.Int, *big.In
 	if act == nil {
 		return nil, nil, 0, nil
 	}
-	nonce, _ := strconv.ParseUint(act.Result["nonce"].(string), 10, 64)
-	gasPrice, _ := strconv.ParseUint(act.Result["gasPrice"].(string), 10, 64)
+	nonceStr, ok := act.Result["nonce"].(string)
+	if !ok {
+		nErr := fmt.Errorf("cannot convert result[nonce] (value %v) to string type", act.Result["nonce"])
+		return nil, nil, count, nErr
+	}
+	gasPriceStr, ok := act.Result["gasPrice"].(string)
+	if !ok {
+		nErr := fmt.Errorf("cannot convert result[gasPrice] (value %v) to string type", act.Result["gasPrice"])
+		return nil, nil, count, nErr
+	}
+	nonce, err := strconv.ParseUint(nonceStr, 10, 64)
+	if err != nil {
+		return nil, nil, count, err
+	}
+	gasPrice, err := strconv.ParseUint(gasPriceStr, 10, 64)
+	if err != nil {
+		return nil, nil, count, err
+	}
 	return big.NewInt(int64(nonce)), big.NewInt(int64(gasPrice)), count, nil
 }
 

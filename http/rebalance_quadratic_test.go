@@ -106,11 +106,11 @@ func TestHTTPServerRebalanceQuadratic(t *testing.T) {
 		}
 	}()
 
-	if err := setting.UpdateToken(common.NewToken("KNC", "KyberNetwork", "xxx", 18, true, true, "", "", "")); err != nil {
-		t.Fatal(err)
+	if uErr := setting.UpdateToken(common.NewToken("KNC", "KyberNetwork", "xxx", 18, true, true, "", "", "")); err != nil {
+		t.Fatal(uErr)
 	}
-	if err := setting.UpdateToken(common.NewToken("ETH", "Etherium", "xxx", 18, true, true, "", "", "")); err != nil {
-		t.Error(err)
+	if uErr := setting.UpdateToken(common.NewToken("ETH", "Etherium", "xxx", 18, true, true, "", "", "")); err != nil {
+		t.Error(uErr)
 	}
 	rqStorage, err := storage.NewBoltStorage(filepath.Join(tmpDir, "test.db"))
 	if err != nil {

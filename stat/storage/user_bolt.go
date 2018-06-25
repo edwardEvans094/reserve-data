@@ -147,51 +147,51 @@ func (self *BoltUserStorage) UpdateUserAddresses(user string, addrs []ethereum.A
 			// remove the addresses bucket assocciated to this temp user
 			b = tx.Bucket([]byte(ID_ADDRESSES))
 			if oldID != nil {
-				if _, err := b.CreateBucketIfNotExists(oldID); err != nil {
-					return err
+				if _, uErr := b.CreateBucketIfNotExists(oldID); err != nil {
+					return uErr
 				}
 
-				if err = b.DeleteBucket(oldID); err != nil {
-					return err
+				if uErr := b.DeleteBucket(oldID); uErr != nil {
+					return uErr
 				}
 			}
-			err = timeBucket.Delete([]byte(address))
-			if err != nil {
-				return err
+			uErr := timeBucket.Delete([]byte(address))
+			if uErr != nil {
+				return uErr
 			}
 			// update user to each address => user
 			b = tx.Bucket([]byte(ADDRESS_ID))
-			if err = b.Put([]byte(address), []byte(user)); err != nil {
-				return err
+			if uErr = b.Put([]byte(address), []byte(user)); uErr != nil {
+				return uErr
 			}
 		}
 		// remove old addresses from pending bucket
 		pendingBk := tx.Bucket([]byte(PENDING_ADDRESSES))
-		oldAddrs, _, err := self.GetAddressesOfUser(user)
-		if err != nil {
-			return err
+		oldAddrs, _, uErr := self.GetAddressesOfUser(user)
+		if uErr != nil {
+			return uErr
 		}
 		for _, oldAddr := range oldAddrs {
-			if err = pendingBk.Delete([]byte(common.AddrToString(oldAddr))); err != nil {
-				return err
+			if uErr = pendingBk.Delete([]byte(common.AddrToString(oldAddr))); uErr != nil {
+				return uErr
 			}
 		}
 		// update addresses bucket for real user
 		// add new addresses to pending bucket
 		b := tx.Bucket([]byte(ID_ADDRESSES))
-		b, err = b.CreateBucketIfNotExists([]byte(user))
-		if err != nil {
-			return err
+		userBucket, uErr := b.CreateBucketIfNotExists([]byte(user))
+		if uErr != nil {
+			return uErr
 		}
 		catBk := tx.Bucket([]byte(ADDRESS_CATEGORY))
 		for i, address := range addresses {
-			if err = b.Put([]byte(address), []byte{1}); err != nil {
-				return err
+			if uErr = userBucket.Put([]byte(address), []byte{1}); uErr != nil {
+				return uErr
 			}
 			cat := catBk.Get([]byte(address))
 			if string(cat) != KYC_CATEGORY {
-				if err = pendingBk.Put([]byte(address), []byte{1}); err != nil {
-					return err
+				if uErr = pendingBk.Put([]byte(address), []byte{1}); uErr != nil {
+					return uErr
 				}
 			}
 			log.Printf("storing timestamp for %s - %d", address, timestamps[i])

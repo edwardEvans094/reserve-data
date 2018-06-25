@@ -127,28 +127,30 @@ func (self *Fetcher) RunRateFetcher() {
 }
 
 func (self *Fetcher) FetchRate(timepoint uint64) {
+	var (
+		err  error
+		data common.AllRateEntry
+	)
 	// only fetch rates 5s after the block number is updated
 	if !self.simulationMode && self.currentBlockUpdateTime-timepoint <= 5000 {
 		return
 	}
-	var err error
-	var data common.AllRateEntry
+
+	var atBlock = self.currentBlock - 1
+	// in simulation mode, just fetches from latest known block
 	if self.simulationMode {
-		data, err = self.blockchain.FetchRates(0, self.currentBlock)
-	} else {
-		data, err = self.blockchain.FetchRates(self.currentBlock-1, self.currentBlock)
+		atBlock = 0
 	}
+
+	data, err = self.blockchain.FetchRates(atBlock, self.currentBlock)
 	if err != nil {
 		log.Printf("Fetching rates from blockchain failed: %s. Will not store it to storage.", err.Error())
-	} else {
-		if data.Valid {
-			log.Printf("Got rates from blockchain: %+v", data)
-			if err = self.storage.StoreRate(data, timepoint); err != nil {
-				log.Printf("Storing rates failed: %s", err.Error())
-			}
-		} else {
-			log.Printf("Got invalid rates from blockchain: %s. Will not store it to storage.", data.Error)
-		}
+		return
+	}
+
+	log.Printf("Got rates from blockchain: %+v", data)
+	if err = self.storage.StoreRate(data, timepoint); err != nil {
+		log.Printf("Storing rates failed: %s", err.Error())
 	}
 }
 
@@ -223,9 +225,9 @@ func (self *Fetcher) FetchAuthDataFromBlockchain(
 	allStatuses *sync.Map,
 	pendings []common.ActivityRecord) {
 	// we apply double check strategy to mitigate race condition on exchange side like this:
-	// 1. RunningMode list of pending activity status (A)
-	// 2. RunningMode list of balances (B)
-	// 3. RunningMode list of pending activity status again (C)
+	// 1. Get list of pending activity status (A)
+	// 2. Get list of balances (B)
+	// 3. Get list of pending activity status again (C)
 	// 4. if C != A, repeat 1, otherwise return A, B
 	var balances map[string]common.BalanceEntry
 	var statuses map[common.ActivityID]common.ActivityStatus
@@ -429,7 +431,7 @@ func (self *Fetcher) PersistSnapshot(
 		status, _ := estatuses.Load(activity.ID)
 		var activityStatus common.ActivityStatus
 		if status != nil {
-			activityStatus := status.(common.ActivityStatus)
+			activityStatus = status.(common.ActivityStatus)
 			log.Printf("In PersistSnapshot: exchange activity status for %+v: %+v", activity.ID, activityStatus)
 			if activity.IsExchangePending() {
 				activity.ExchangeStatus = activityStatus.ExchangeStatus
@@ -486,9 +488,9 @@ func (self *Fetcher) FetchAuthDataFromExchange(
 	timepoint uint64) {
 	defer wg.Done()
 	// we apply double check strategy to mitigate race condition on exchange side like this:
-	// 1. RunningMode list of pending activity status (A)
-	// 2. RunningMode list of balances (B)
-	// 3. RunningMode list of pending activity status again (C)
+	// 1. Get list of pending activity status (A)
+	// 2. Get list of balances (B)
+	// 3. Get list of pending activity status again (C)
 	// 4. if C != A, repeat 1, otherwise return A, B
 	var balances common.EBalanceEntry
 	var statuses map[common.ActivityID]common.ActivityStatus

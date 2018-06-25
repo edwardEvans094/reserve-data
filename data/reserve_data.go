@@ -138,8 +138,6 @@ func getOneRateData(rate common.AllRateEntry) map[string]common.RateResponse {
 	data := map[string]common.RateResponse{}
 	for tokenID, r := range rate.Data {
 		data[tokenID] = common.RateResponse{
-			Valid:       rate.Valid,
-			Error:       rate.Error,
 			Timestamp:   rate.Timestamp,
 			ReturnTime:  rate.ReturnTime,
 			BaseBuy:     common.BigToFloat(r.BaseBuy, 18),
@@ -164,8 +162,6 @@ func (self ReserveData) GetRates(fromTime, toTime uint64) ([]common.AllRateRespo
 		one := common.AllRateResponse{}
 		one.Timestamp = rate.Timestamp
 		one.ReturnTime = rate.ReturnTime
-		one.Error = rate.Error
-		one.Valid = rate.Valid
 		one.Data = getOneRateData(rate)
 		one.BlockNumber = rate.BlockNumber
 		//if one is the same as current
@@ -201,8 +197,6 @@ func (self ReserveData) GetRate(timepoint uint64) (common.AllRateResponse, error
 		data := map[string]common.RateResponse{}
 		for tokenID, rate := range rates.Data {
 			data[tokenID] = common.RateResponse{
-				Valid:       rates.Valid,
-				Error:       rates.Error,
 				Timestamp:   rates.Timestamp,
 				ReturnTime:  rates.ReturnTime,
 				BaseBuy:     common.BigToFloat(rate.BaseBuy, 18),

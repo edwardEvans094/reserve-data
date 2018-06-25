@@ -40,7 +40,7 @@ func (self *StatStorageTest) TestTradeStatsSummary() error {
 	)
 	tzmtStat := common.MetricStatsTimeZone{0: {0: mtStat}}
 	updates := map[string]common.MetricStatsTimeZone{"trade_summary": tzmtStat}
-	if err := self.storage.SetTradeSummary(updates, 0); err != nil {
+	if err = self.storage.SetTradeSummary(updates, 0); err != nil {
 		return err
 	}
 	tradeSum, err := self.storage.GetTradeSummary(0, 86400000, 0)

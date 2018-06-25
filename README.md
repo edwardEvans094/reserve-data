@@ -248,7 +248,7 @@ Form params:
 eg:
 ```
 curl -X POST \
-  http://localhost:8000/deposit/liqui \
+  http://localhost:8000/deposit/binance\
   -H 'content-type: multipart/form-data' \
   -F token=EOS \
   -F amount=0xde0b6b3a7640000
@@ -275,7 +275,7 @@ Form params:
 eg:
 ```
 curl -X POST \
-  http://localhost:8000/withdraw/liqui \
+  http://localhost:8000/withdraw/binance\
   -H 'content-type: multipart/form-data' \
   -F token=EOS \
   -F amount=0xde0b6b3a7640000
@@ -327,7 +327,7 @@ Form params:
 eg:
 ```
 curl -X POST \
-  http://localhost:8000/trade/liqui \
+  http://localhost:8000/trade/binance\
   -F base=ETH \
   -F quote=KNC \
   -F rate=300 \
@@ -1604,5 +1604,4 @@ Example:
 
 1. Bittrex (bittrex)
 2. Binance (binance)
-3. Huobi (huobi) - on going
-4. Bitfinex (bitfinex) - on going
+3. Huobi (huobi)

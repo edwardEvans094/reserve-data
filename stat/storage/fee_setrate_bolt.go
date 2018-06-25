@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/big"
 	"strconv"
 	"time"
@@ -79,43 +78,41 @@ func (self *BoltFeeSetRateStorage) GetLastBlockChecked() (uint64, error) {
 func (self *BoltFeeSetRateStorage) StoreTransaction(txs []common.SetRateTxInfo) error {
 	var err error
 	err = self.db.Update(func(tx *bolt.Tx) error {
-		var dataJson []byte
+		var dataJSON []byte
 		b := tx.Bucket([]byte(TRANSACTION_INFO_BUCKET))
 		bIndex := tx.Bucket([]byte(INDEXED_TIMESTAMP_BUCKET))
 		bTotal := tx.Bucket([]byte(TOTAL_GAS_SPENT_BUCKET))
 
 		for _, transaction := range txs {
-			blockNumUint, err := strconv.ParseUint(transaction.BlockNumber, 10, 64)
-			if err != nil {
-				log.Printf("Cant convert %s to uint64", transaction.BlockNumber)
-				return err
+			blockNumUint, uErr := strconv.ParseUint(transaction.BlockNumber, 10, 64)
+			if uErr != nil {
+				return uErr
 			}
-			txIndexUint, err := strconv.ParseUint(transaction.TransactionIndex, 10, 64)
-			if err != nil {
-				log.Printf("Cant convert %s to uint64", transaction.TransactionIndex)
-				return err
+			txIndexUint, uErr := strconv.ParseUint(transaction.TransactionIndex, 10, 64)
+			if uErr != nil {
+				return uErr
 			}
 			keyStoreUint := blockNumUint*1000000 + txIndexUint
 			keyStore := boltutil.Uint64ToBytes(keyStoreUint)
-			storeTx, err := common.GetStoreTx(transaction)
-			if err != nil {
-				return err
+			storeTx, uErr := common.GetStoreTx(transaction)
+			if uErr != nil {
+				return uErr
 			}
-			err = bIndex.Put(boltutil.Uint64ToBytes(storeTx.TimeStamp), keyStore)
-			if err != nil {
-				return err
+			uErr = bIndex.Put(boltutil.Uint64ToBytes(storeTx.TimeStamp), keyStore)
+			if uErr != nil {
+				return uErr
 			}
-			err = storeTotalGasSpent(bTotal, storeTx)
-			if err != nil {
-				return err
+			uErr = storeTotalGasSpent(bTotal, storeTx)
+			if uErr != nil {
+				return uErr
 			}
-			dataJson, err = json.Marshal(storeTx)
-			if err != nil {
-				return err
+			dataJSON, uErr = json.Marshal(storeTx)
+			if uErr != nil {
+				return uErr
 			}
-			err = b.Put(keyStore, dataJson)
-			if err != nil {
-				return err
+			uErr = b.Put(keyStore, dataJSON)
+			if uErr != nil {
+				return uErr
 			}
 		}
 		return nil
@@ -178,9 +175,9 @@ func (self *BoltFeeSetRateStorage) GetFeeSetRateByDay(fromTime, toTime uint64) (
 			_, nextTickBlock := cIndex.Seek(nextTick)
 			if tickBlock != nil && nextTickBlock != nil {
 				totalGasSpent := bTotal.Get(tickTime)
-				feeSetRate, err := getFeeSetRate(c, tickBlock, nextTickBlock, tickTime, totalGasSpent)
-				if err != nil {
-					return err
+				feeSetRate, vErr := getFeeSetRate(c, tickBlock, nextTickBlock, tickTime, totalGasSpent)
+				if vErr != nil {
+					return vErr
 				}
 				// if timestamp = 0 means that there are no setrate activities on this day
 				if feeSetRate.TimeStamp != 0 {

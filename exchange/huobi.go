@@ -83,7 +83,7 @@ func (self *Huobi) UpdatePrecisionLimit(pair common.TokenPair, symbols HuobiExch
 func (self *Huobi) UpdatePairsPrecision() {
 	exchangeInfo, err := self.interf.GetExchangeInfo()
 	if err != nil {
-		log.Printf("RunningMode exchange info failed: %s\n", err)
+		log.Printf("Get exchange info failed: %s\n", err)
 	} else {
 		for _, pair := range self.pairs {
 			self.UpdatePrecisionLimit(pair, exchangeInfo)
@@ -124,11 +124,21 @@ func (self *Huobi) QueryOrder(symbol string, id uint64) (done float64, remaining
 	result, err := self.interf.OrderStatus(symbol, id)
 	if err != nil {
 		return 0, 0, false, err
-	} else {
-		done, _ := strconv.ParseFloat(result.Data.ExecutedQty, 64)
-		total, _ := strconv.ParseFloat(result.Data.OrigQty, 64)
-		return done, total - done, total-done < HUOBI_EPSILON, nil
 	}
+	if result.Data.ExecutedQty != "" {
+		done, err = strconv.ParseFloat(result.Data.ExecutedQty, 64)
+		if err != nil {
+			return 0, 0, false, err
+		}
+	}
+	var total float64
+	if result.Data.OrigQty != "" {
+		total, err = strconv.ParseFloat(result.Data.OrigQty, 64)
+		if err != nil {
+			return 0, 0, false, err
+		}
+	}
+	return done, total - done, total-done < HUOBI_EPSILON, nil
 }
 
 func (self *Huobi) Trade(tradeType string, base common.Token, quote common.Token, rate float64, amount float64, timepoint uint64) (id string, done float64, remaining float64, finished bool, err error) {
@@ -136,14 +146,22 @@ func (self *Huobi) Trade(tradeType string, base common.Token, quote common.Token
 
 	if err != nil {
 		return "", 0, 0, false, err
-	} else {
-		orderID, _ := strconv.ParseUint(result.OrderID, 10, 64)
-		done, remaining, finished, err := self.QueryOrder(
-			base.ID+quote.ID,
-			orderID,
-		)
-		return result.OrderID, done, remaining, finished, err
 	}
+	var orderID uint64
+	if result.OrderID != "" {
+		orderID, err = strconv.ParseUint(result.OrderID, 10, 64)
+		if err != nil {
+			return "", 0, 0, false, err
+		}
+	}
+	done, remaining, finished, err = self.QueryOrder(
+		base.ID+quote.ID,
+		orderID,
+	)
+	if err != nil {
+		log.Printf("Query order error: %s", err.Error())
+	}
+	return result.OrderID, done, remaining, finished, err
 }
 
 func (self *Huobi) Withdraw(token common.Token, amount *big.Int, address ethereum.Address, timepoint uint64) (string, error) {
@@ -481,111 +499,109 @@ func (self *Huobi) DepositStatus(id common.ActivityID, tx1Hash, currency string,
 				log.Printf("Trying to store 2nd tx to pending tx storage failed, error: %s. It will be ignored and can make us to send to huobi again and the deposit will be marked as failed because the fund is not efficient", err.Error())
 			}
 			return "", nil
-		} else {
-			//No need to handle other blockchain status of TX1 here, since Fetcher will handle it from blockchain Status.
+		}
+		//No need to handle other blockchain status of TX1 here, since Fetcher will handle it from blockchain Status.
+		return "", nil
+	}
+	// if there is tx2Entry, check it blockchain status first:
+	status, _, err := self.blockchain.TxStatus(ethereum.HexToHash(tx2Entry.Hash))
+	if err != nil {
+		return "", err
+	}
+	if status == "mined" {
+		log.Println("2nd Transaction is mined. Processed to store it and check the Huobi Deposit history")
+		data = common.NewTXEntry(
+			tx2Entry.Hash,
+			self.Name(),
+			currency,
+			"mined",
+			"",
+			sentAmount,
+			common.GetTimestamp(),
+		)
+
+		if err = self.storage.StorePendingIntermediateTx(id, data); err != nil {
+			log.Printf("Trying to store intermediate tx to huobi storage, error: %s. Ignore it and try later", err.Error())
 			return "", nil
 		}
-	} else {
-		// if there is tx2Entry, check it blockchain status first:
-		status, _, err := self.blockchain.TxStatus(ethereum.HexToHash(tx2Entry.Hash))
-		if err != nil {
-			return "", err
+
+		var deposits HuobiDeposits
+		deposits, err = self.interf.DepositHistory()
+		if err != nil || deposits.Status != "ok" {
+			log.Printf("Getting deposit history from huobi failed, error: %v, status: %s", err, deposits.Status)
+			return "", nil
 		}
-		if status == "mined" {
-			log.Println("2nd Transaction is mined. Processed to store it and check the Huobi Deposit history")
-			data = common.NewTXEntry(
-				tx2Entry.Hash,
-				self.Name(),
-				currency,
-				"mined",
-				"",
-				sentAmount,
-				common.GetTimestamp(),
-			)
-			err = self.storage.StorePendingIntermediateTx(id, data)
-			if err != nil {
-				log.Printf("Trying to store intermediate tx to huobi storage, error: %s. Ignore it and try later", err.Error())
-				return "", nil
-			}
-			deposits, err := self.interf.DepositHistory()
-			if err != nil || deposits.Status != "ok" {
-				log.Printf("Getting deposit history from huobi failed, error: %v, status: %s", err, deposits.Status)
-				return "", nil
-			}
-			//check tx2 deposit status from Huobi
-			for _, deposit := range deposits.Data {
-				// log.Printf("deposit tx is %s, with token %s", deposit.TxHash, deposit.Currency)
-				if deposit.TxHash == tx2Entry.Hash {
-					if deposit.State == "safe" || deposit.State == "confirmed" {
-						data = common.NewTXEntry(
-							tx2Entry.Hash,
-							self.Name(),
-							currency,
-							"mined",
-							"done",
-							sentAmount,
-							common.GetTimestamp(),
-						)
-						err = self.storage.StoreIntermediateTx(id, data)
-						if err != nil {
-							log.Printf("Trying to store intermediate tx to huobi storage, error: %s. Ignore it and try later", err.Error())
-							return "", nil
-						}
-						err = self.storage.RemovePendingIntermediateTx(id)
-						if err != nil {
-							log.Printf("Trying to remove pending intermediate tx from huobi storage, error: %s. Ignore it and treat it like it is still pending", err.Error())
-							return "", nil
-						}
-						return "done", nil
-					} else {
-						//TODO : handle other states following https://github.com/huobiapi/API_Docs_en/wiki/REST_Reference#deposit-states
-						log.Printf("Tx %s is found but the status was not safe but %s", deposit.TxHash, deposit.State)
+		//check tx2 deposit status from Huobi
+		for _, deposit := range deposits.Data {
+			// log.Printf("deposit tx is %s, with token %s", deposit.TxHash, deposit.Currency)
+			if deposit.TxHash == tx2Entry.Hash {
+				if deposit.State == "safe" || deposit.State == "confirmed" {
+					data = common.NewTXEntry(
+						tx2Entry.Hash,
+						self.Name(),
+						currency,
+						"mined",
+						"done",
+						sentAmount,
+						common.GetTimestamp(),
+					)
+
+					if err = self.storage.StoreIntermediateTx(id, data); err != nil {
+						log.Printf("Trying to store intermediate tx to huobi storage, error: %s. Ignore it and try later", err.Error())
 						return "", nil
 					}
+
+					if err = self.storage.RemovePendingIntermediateTx(id); err != nil {
+						log.Printf("Trying to remove pending intermediate tx from huobi storage, error: %s. Ignore it and treat it like it is still pending", err.Error())
+						return "", nil
+					}
+					return "done", nil
 				}
+				//TODO : handle other states following https://github.com/huobiapi/API_Docs_en/wiki/REST_Reference#deposit-states
+				log.Printf("Tx %s is found but the status was not safe but %s", deposit.TxHash, deposit.State)
+				return "", nil
 			}
-			log.Printf("Deposit doesn't exist. Huobi hasn't recognized the deposit yet or in theory, you have more than %d deposits at the same time.", len(common.InternalTokens())*2)
-			return "", nil
-		} else if status == "failed" {
+		}
+		log.Printf("Deposit doesn't exist. Huobi hasn't recognized the deposit yet or in theory, you have more than %d deposits at the same time.", len(common.InternalTokens())*2)
+		return "", nil
+	} else if status == "failed" {
+		data = common.NewTXEntry(
+			tx2Entry.Hash,
+			self.Name(),
+			currency,
+			"failed",
+			"failed",
+			sentAmount,
+			common.GetTimestamp(),
+		)
+
+		return "failed", nil
+	} else if status == "lost" {
+		elapsed := common.GetTimepoint() - tx2Entry.Timestamp.ToUint64()
+		if elapsed > uint64(15*time.Minute/time.Millisecond) {
 			data = common.NewTXEntry(
 				tx2Entry.Hash,
 				self.Name(),
 				currency,
-				"failed",
-				"failed",
+				"lost",
+				"lost",
 				sentAmount,
 				common.GetTimestamp(),
 			)
 
-			return "failed", nil
-		} else if status == "lost" {
-			elapsed := common.GetTimepoint() - tx2Entry.Timestamp.ToUint64()
-			if elapsed > uint64(15*time.Minute/time.Millisecond) {
-				data = common.NewTXEntry(
-					tx2Entry.Hash,
-					self.Name(),
-					currency,
-					"lost",
-					"lost",
-					sentAmount,
-					common.GetTimestamp(),
-				)
-				err = self.storage.StoreIntermediateTx(id, data)
-				if err != nil {
-					log.Printf("Trying to store intermediate tx failed, error: %s. Ignore it and treat it like it is still pending", err.Error())
-					return "", nil
-				}
-				err = self.storage.RemovePendingIntermediateTx(id)
-				if err != nil {
-					log.Printf("Trying to remove pending intermediate tx from huobi storage, error: %s. Ignore it and treat it like it is still pending", err.Error())
-					return "", nil
-				}
-				log.Printf("The tx is not found for over 15mins, it is considered as lost and the deposit failed")
-				return "failed", nil
-			} else {
+			if err = self.storage.StoreIntermediateTx(id, data); err != nil {
+				log.Printf("Trying to store intermediate tx failed, error: %s. Ignore it and treat it like it is still pending", err.Error())
 				return "", nil
 			}
+
+			if err = self.storage.RemovePendingIntermediateTx(id); err != nil {
+				log.Printf("Trying to remove pending intermediate tx from huobi storage, error: %s. Ignore it and treat it like it is still pending", err.Error())
+				return "", nil
+			}
+			log.Printf("The tx is not found for over 15mins, it is considered as lost and the deposit failed")
+			return "failed", nil
 		}
+		return "", nil
 	}
 	log.Printf("should not be here")
 	return "", nil
@@ -622,9 +638,8 @@ func (self *Huobi) OrderStatus(id string, base, quote string) (string, error) {
 	}
 	if order.Data.State == "pre-submitted" || order.Data.State == "submitting" || order.Data.State == "submitted" || order.Data.State == "partial-filled" || order.Data.State == "partial-canceled" {
 		return "", nil
-	} else {
-		return "done", nil
 	}
+	return "done", nil
 }
 
 func NewHuobi(

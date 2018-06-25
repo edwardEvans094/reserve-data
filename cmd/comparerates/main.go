@@ -38,13 +38,11 @@ func GetActivitiesResponse(url string, params map[string]string, config configur
 	var allActionRep AllActionHTTPReply
 	params["nonce"] = nonce
 	data, err := GetResponse("GET", fmt.Sprintf("%s/%s", url, "activities"), params, true, config)
-
 	if err != nil {
 		return allActionRep, err
 	}
-	if err := json.Unmarshal(data, &allActionRep); err != nil {
-		return allActionRep, err
-	}
+
+	err = json.Unmarshal(data, &allActionRep)
 	return allActionRep, err
 }
 
@@ -99,15 +97,13 @@ func printRateResponse(oneRate common.AllRateResponse) {
 	i := int64(oneRate.Timestamp.ToUint64()) / 1000
 	log.Printf("\t Time: %v\n", time.Unix(i, 0))
 	log.Printf("\t TimeStamp %v\n", oneRate.Timestamp)
-	log.Printf("\t Error: %v\n", oneRate.Error)
 	log.Printf("\t Data: \n")
 	for k, v := range oneRate.Data {
-		log.Printf("\t Token\t\t BaseBuy\t\t BaseSell\t Error\t Block\t \n")
-		log.Printf("\t %s \t %v \t %v\t %v\t %v ", k, v.BaseBuy, v.BaseSell, v.Error, v.Block)
+		log.Printf("\t Token\t\t BaseBuy\t\t BaseSell\t Block\t \n")
+		log.Printf("\t %s \t %v \t %v\t %v", k, v.BaseBuy, v.BaseSell, v.Block)
 		log.Printf("\t CompactBuy\t CompactSell\t Rate\t Valid\t TimeStamp\n")
-		log.Printf("\t %v\t\t %v\t\t %v\t %v\t %v \n\n", v.CompactBuy, v.CompactSell, v.Rate, v.Valid, v.Timestamp)
+		log.Printf("\t %v\t\t %v\t\t %v\t %v \n\n", v.CompactBuy, v.CompactSell, v.Rate, v.Timestamp)
 	}
-	log.Printf("\t Valid: %t\n", oneRate.Valid)
 	log.Printf("\t Version: %v \n", oneRate.Version)
 }
 

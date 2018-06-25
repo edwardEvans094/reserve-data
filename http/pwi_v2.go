@@ -24,12 +24,14 @@ func (self *HTTPServer) GetPWIEquationV2(c *gin.Context) {
 
 // SetPWIEquationV2 stores the given PWI equations to pending for later evaluation.
 func (self *HTTPServer) SetPWIEquationV2(c *gin.Context) {
-	postForm, ok := self.Authenticated(c, []string{}, []Permission{ConfigurePermission})
+	const dataPostFormKey = "data"
+
+	postForm, ok := self.Authenticated(c, []string{dataPostFormKey}, []Permission{ConfigurePermission})
 	if !ok {
 		return
 	}
 
-	data := []byte(postForm.Get("data"))
+	data := []byte(postForm.Get(dataPostFormKey))
 	if len(data) > MAX_DATA_SIZE {
 		httputil.ResponseFailure(c, httputil.WithError(errDataSizeExceed))
 		return
@@ -68,11 +70,13 @@ func (self *HTTPServer) GetPendingPWIEquationV2(c *gin.Context) {
 
 // ConfirmPWIEquationV2 accepts the pending PWI equations and remove it from pending bucket.
 func (self *HTTPServer) ConfirmPWIEquationV2(c *gin.Context) {
-	postForm, ok := self.Authenticated(c, []string{}, []Permission{ConfirmConfPermission})
+	const dataPostFormKey = "data"
+
+	postForm, ok := self.Authenticated(c, []string{dataPostFormKey}, []Permission{ConfirmConfPermission})
 	if !ok {
 		return
 	}
-	postData := postForm.Get("data")
+	postData := postForm.Get(dataPostFormKey)
 	err := self.metric.StorePWIEquationV2(postData)
 	if err != nil {
 		httputil.ResponseFailure(c, httputil.WithError(err))

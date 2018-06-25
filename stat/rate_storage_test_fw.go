@@ -35,7 +35,7 @@ func (self *RateStorageTest) TestReserveRates() error {
 	}
 	rate = result[0]
 	if rate.BlockNumber != 333 {
-		return fmt.Errorf("RunningMode ReserverRates return wrong result, expect blockNumber 333, got %d ", rate.BlockNumber)
+		return fmt.Errorf("Get ReserverRates return wrong result, expect blockNumber 333, got %d ", rate.BlockNumber)
 	}
 	return err
 }

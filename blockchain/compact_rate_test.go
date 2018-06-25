@@ -115,9 +115,9 @@ func TestBuildCompactBulk(t *testing.T) {
 		ethereum.HexToAddress(addr3): 28,
 	}
 	indicesInput := map[string]tbindex{
-		addr1: {3, 9},
-		addr2: {9, 5},
-		addr3: {9, 6},
+		addr1: newTBIndex(3, 9),
+		addr2: newTBIndex(9, 5),
+		addr3: newTBIndex(9, 6),
 	}
 	buyBulk, sellBulk, indices := BuildCompactBulk(
 		buysInput, sellsInput, indicesInput)

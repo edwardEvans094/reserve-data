@@ -53,11 +53,17 @@ func (self *BinanceEndpoint) fillRequest(req *http.Request, signNeeded bool, tim
 func (self *BinanceEndpoint) GetResponse(
 	method string, url string,
 	params map[string]string, signNeeded bool, timepoint uint64) ([]byte, error) {
-
+	var (
+		err      error
+		respBody []byte
+	)
 	client := &http.Client{
 		Timeout: time.Duration(30 * time.Second),
 	}
-	req, _ := http.NewRequest(method, url, nil)
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Add("Accept", "application/json")
 
 	q := req.URL.Query()
@@ -66,30 +72,29 @@ func (self *BinanceEndpoint) GetResponse(
 	}
 	req.URL.RawQuery = q.Encode()
 	self.fillRequest(req, signNeeded, timepoint)
-	var err error
-	var respBody []byte
+
 	log.Printf("request to binance: %s\n", req.URL)
 	resp, err := client.Do(req)
 	if err != nil {
 		return respBody, err
 	}
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Printf("Response body close error: %s", err.Error())
+		if cErr := resp.Body.Close(); cErr != nil {
+			log.Printf("Response body close error: %s", cErr.Error())
 		}
 	}()
 	switch resp.StatusCode {
 	case 429:
-		err = errors.New("breaking a request rate limit")
+		err = errors.New("breaking binance request rate limit")
 		break
 	case 418:
-		err = errors.New("ip has been auto-banned for continuing to send requests after receiving 429 codes")
+		err = errors.New("ip has been auto-banned by binance for continuing to send requests after receiving 429 codes")
 		break
 	case 500:
 		err = errors.New("500 from Binance, its fault")
 		break
 	case 401:
-		err = errors.New("api key not valid")
+		err = errors.New("binance api key not valid")
 		break
 	case 200:
 		respBody, err = ioutil.ReadAll(resp.Body)

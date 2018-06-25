@@ -3,7 +3,6 @@ package binance
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"strconv"
@@ -23,7 +22,7 @@ type BinanceStorage struct {
 	db *bolt.DB
 }
 
-func NewBoltExchangeStorage(path string) (*BinanceStorage, error) {
+func NewBoltStorage(path string) (*BinanceStorage, error) {
 	// init instance
 	var err error
 	var db *bolt.DB
@@ -47,33 +46,26 @@ func NewBoltExchangeStorage(path string) (*BinanceStorage, error) {
 }
 
 func (self *BinanceStorage) StoreTradeHistory(data common.ExchangeTradeHistory) error {
-	var err error
-	err = self.db.Update(func(tx *bolt.Tx) error {
+	err := self.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(TRADE_HISTORY))
-		if err != nil {
-			log.Printf("Cannot create exchange history bucket: %s", err.Error())
-			return err
-		}
 		for pair, pairHistory := range data {
-			pairBk, err := b.CreateBucketIfNotExists([]byte(pair))
-			if err != nil {
-				log.Printf("Cannot create pair history bucket: %s", err.Error())
-				return err
+			pairBk, uErr := b.CreateBucketIfNotExists([]byte(pair))
+			if uErr != nil {
+				return uErr
 			}
 			for _, history := range pairHistory {
 				idBytes := []byte(fmt.Sprintf("%s%s", strconv.FormatUint(history.Timestamp, 10), history.ID))
-				dataJSON, err := json.Marshal(history)
-				if err != nil {
-					log.Printf("Cannot marshal history: %s", err.Error())
+				dataJSON, uErr := json.Marshal(history)
+				if uErr != nil {
+					return uErr
 				}
-				err = pairBk.Put(idBytes, dataJSON)
-				if err != nil {
-					log.Printf("Cannot put new data: %s", err.Error())
-					return err
+				uErr = pairBk.Put(idBytes, dataJSON)
+				if uErr != nil {
+					return uErr
 				}
 			}
 		}
-		return err
+		return nil
 	})
 	return err
 }
@@ -82,7 +74,7 @@ func (self *BinanceStorage) GetTradeHistory(fromTime, toTime uint64) (common.Exc
 	result := common.ExchangeTradeHistory{}
 	var err error
 	if toTime-fromTime > MAX_GET_TRADE_HISTORY {
-		return result, errors.New(fmt.Sprintf("Time range is too broad, it must be smaller or equal to 3 days (miliseconds)"))
+		return result, fmt.Errorf("Time range is too broad, it must be smaller or equal to 3 days (miliseconds)")
 	}
 	min := []byte(strconv.FormatUint(fromTime, 10))
 	max := []byte(strconv.FormatUint(toTime, 10))

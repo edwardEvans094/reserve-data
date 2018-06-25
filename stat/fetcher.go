@@ -153,8 +153,8 @@ func (self *Fetcher) FetchTxs(client http.Client) error {
 		return err
 	}
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Printf("cannot close response body: %s", err.Error())
+		if cErr := resp.Body.Close(); cErr != nil {
+			log.Printf("cannot close response body: %s", cErr.Error())
 		}
 	}()
 	body, err := ioutil.ReadAll(resp.Body)
@@ -242,7 +242,8 @@ func (self *Fetcher) RunCatLogProcessor() {
 		if fromTime == 1 {
 			// there is no cat log being processed before
 			// load the first log we have and set the fromTime to it's timestamp
-			l, err := self.logStorage.GetFirstCatLog()
+			var l common.SetCatLog
+			l, err = self.logStorage.GetFirstCatLog()
 			if err != nil {
 				log.Printf("can't get first cat log: err(%s)", err)
 				continue
@@ -709,11 +710,11 @@ func (self *Fetcher) RunLogFetcher() {
 			if lastBlock+1 > toBlock {
 				continue
 			}
-			nextBlock, err := self.FetchLogs(lastBlock+1, toBlock, timepoint)
-			if err != nil {
+			nextBlock, fErr := self.FetchLogs(lastBlock+1, toBlock, timepoint)
+			if fErr != nil {
 				// in case there is error, we roll back and try it again.
 				// dont have to do anything here. just continute with the loop.
-				log.Printf("LogFetcher - continue with the loop to try it again")
+				log.Printf("LogFetcher - continue with the loop to try it again: %s", fErr)
 			} else {
 				if nextBlock == lastBlock && toBlock != 0 {
 					// in case that we are querying old blocks (6 hours in the past)
@@ -724,7 +725,7 @@ func (self *Fetcher) RunLogFetcher() {
 					nextBlock = toBlock
 				}
 				log.Printf("LogFetcher - update log block: %d", nextBlock)
-				if err := self.logStorage.UpdateLogBlock(nextBlock, timepoint); err != nil {
+				if err = self.logStorage.UpdateLogBlock(nextBlock, timepoint); err != nil {
 					log.Printf("Update log block: %s", err.Error())
 				}
 			}
@@ -755,8 +756,8 @@ func GetTradeGeo(txHash string) (string, string, error) {
 	}
 	response := common.TradeLogGeoInfoResp{}
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Printf("Response body close error: %s", err.Error())
+		if cErr := resp.Body.Close(); cErr != nil {
+			log.Printf("Response body close error: %s", cErr.Error())
 		}
 	}()
 	body, err := ioutil.ReadAll(resp.Body)
@@ -768,10 +769,11 @@ func GetTradeGeo(txHash string) (string, string, error) {
 		return "", "", err
 	}
 	if response.Success {
+		var country string
 		if response.Data.Country != "" {
 			return response.Data.IP, response.Data.Country, err
 		}
-		country, err := util.IPToCountry(response.Data.IP)
+		country, err = util.IPToCountry(response.Data.IP)
 		if err != nil {
 			return "", "", err
 		}

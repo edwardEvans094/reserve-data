@@ -55,7 +55,10 @@ func (self *BittrexEndpoint) GetResponse(
 	client := &http.Client{
 		Timeout: time.Duration(30 * time.Second),
 	}
-	req, _ := http.NewRequest("GET", url, nil)
+	req, newHTTPErr := http.NewRequest("GET", url, nil)
+	if newHTTPErr != nil {
+		return nil, newHTTPErr
+	}
 	req.Header.Add("Accept", "application/json")
 
 	q := req.URL.Query()
@@ -72,8 +75,8 @@ func (self *BittrexEndpoint) GetResponse(
 		return respBody, err
 	}
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Printf("Unmarshal response error: %s", err.Error())
+		if cErr := resp.Body.Close(); cErr != nil {
+			log.Printf("Unmarshal response error: %s", cErr.Error())
 		}
 	}()
 	respBody, err = ioutil.ReadAll(resp.Body)
@@ -267,7 +270,7 @@ func (self *BittrexEndpoint) GetAccountTradeHistory(base, quote common.Token) (e
 			return result, err
 		}
 		if !result.Success {
-			return result, fmt.Errorf("Cannot get trade history: %s", result.Message)
+			return result, fmt.Errorf("Cannot get Bittrex trade history: %s", result.Message)
 		}
 	}
 	return result, err

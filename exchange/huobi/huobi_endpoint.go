@@ -90,8 +90,8 @@ func (self *HuobiEndpoint) GetResponse(
 		return respBody, err
 	}
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Printf("Response body close error: %s", err.Error())
+		if cErr := resp.Body.Close(); cErr != nil {
+			log.Printf("Response body close error: %s", cErr.Error())
 		}
 	}()
 	respBody, err = ioutil.ReadAll(resp.Body)
@@ -137,9 +137,12 @@ func (self *HuobiEndpoint) Trade(tradeType string, base, quote common.Token, rat
 	result := exchange.HuobiTrade{}
 	symbol := strings.ToLower(base.ID) + strings.ToLower(quote.ID)
 	orderType := tradeType + "-limit"
-	accounts, _ := self.GetAccounts()
+	accounts, err := self.GetAccounts()
+	if err != nil {
+		return result, err
+	}
 	if len(accounts.Data) == 0 {
-		return result, errors.New("Cannot get account")
+		return result, errors.New("Cannot get Huobi account")
 	}
 	params := map[string]string{
 		"account-id": strconv.FormatUint(accounts.Data[0].ID, 10),
@@ -162,7 +165,7 @@ func (self *HuobiEndpoint) Trade(tradeType string, base, quote common.Token, rat
 		return result, err
 	}
 	if result.Status != "ok" {
-		return result, fmt.Errorf("create order failed: %s", result.Reason)
+		return result, fmt.Errorf("create Huobi order failed: %s", result.Reason)
 	}
 	return result, nil
 }
@@ -232,7 +235,7 @@ func (self *HuobiEndpoint) CancelOrder(symbol string, id uint64) (exchange.Huobi
 		return result, err
 	}
 	if result.Status != "ok" {
-		err = fmt.Errorf("cancel order failed: %s", result.Reason)
+		err = fmt.Errorf("cancel Huobi order failed: %s", result.Reason)
 	}
 	return result, err
 }
@@ -254,7 +257,7 @@ func (self *HuobiEndpoint) OrderStatus(symbol string, id uint64) (exchange.Huobi
 		return result, err
 	}
 	if result.Status != "ok" {
-		err = fmt.Errorf("RunningMode order status failed: %s", result.Reason)
+		err = fmt.Errorf("Get Huobi order status failed: %s", result.Reason)
 	}
 	return result, err
 }
@@ -286,9 +289,12 @@ func (self *HuobiEndpoint) Withdraw(token common.Token, amount *big.Int, address
 
 func (self *HuobiEndpoint) GetInfo() (exchange.HuobiInfo, error) {
 	result := exchange.HuobiInfo{}
-	accounts, _ := self.GetAccounts()
+	accounts, err := self.GetAccounts()
+	if err != nil {
+		return result, err
+	}
 	if len(accounts.Data) == 0 {
-		return result, errors.New("Cannot get account")
+		return result, errors.New("Cannot get Huobi account")
 	}
 	respBody, err := self.GetResponse(
 		"GET",
@@ -355,7 +361,7 @@ func (self *HuobiEndpoint) GetDepositAddress(asset string) (exchange.HuobiDeposi
 			return result, err
 		}
 		if !result.Success {
-			err = fmt.Errorf("get deposit address failed: %s", result.Reason)
+			err = fmt.Errorf("get Huobi deposit address failed: %s", result.Reason)
 		}
 	}
 	return result, err

@@ -112,7 +112,7 @@ func (self *Binance) UpdatePrecisionLimit(pair common.TokenPair, symbols []Binan
 func (self *Binance) UpdatePairsPrecision() {
 	exchangeInfo, err := self.interf.GetExchangeInfo()
 	if err != nil {
-		log.Printf("RunningMode exchange info failed: %s\n", err)
+		log.Printf("Get exchange info failed: %s\n", err)
 	} else {
 		symbols := exchangeInfo.Symbols
 		for _, pair := range self.pairs {

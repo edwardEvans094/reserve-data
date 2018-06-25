@@ -14,7 +14,7 @@ import (
 func (h *HTTPServer) CheckRebalanceQuadraticRequest(rq metric.RebalanceQuadraticRequest) error {
 	for tokenID := range rq {
 		if _, err := h.setting.GetInternalTokenByID(tokenID); err != nil {
-			return fmt.Errorf("unsupported token %s", tokenID)
+			return fmt.Errorf("Getting token %s got err %s", tokenID, err.Error())
 		}
 	}
 	return nil

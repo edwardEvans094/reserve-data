@@ -42,4 +42,10 @@ type MetricStorage interface {
 	StorePWIEquationV2(data string) error
 	RemovePendingPWIEquationV2() error
 	GetPWIEquationV2() (PWIEquationRequestV2, error)
+
+	StorePendingRebalanceQuadratic([]byte) error
+	GetPendingRebalanceQuadratic() (RebalanceQuadraticRequest, error)
+	ConfirmRebalanceQuadratic(data []byte) error
+	RemovePendingRebalanceQuadratic() error
+	GetRebalanceQuadratic() (RebalanceQuadraticRequest, error)
 }

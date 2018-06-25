@@ -50,6 +50,11 @@ const (
 	PENDING_PWI_EQUATION_V2 string = "pending_pwi_equation_v2"
 	// PWI_EQUATION_V2 stores the PWI equations after confirmed.
 	PWI_EQUATION_V2 string = "pwi_equation_v2"
+
+	// PENDING_REBALANCE_QUADRATIC stores pending rebalance quadratic equation
+	PENDING_REBALANCE_QUADRATIC = "pending_rebalance_quadratic"
+	// REBALANCE_QUADRATIC stores rebalance quadratic equation
+	REBALANCE_QUADRATIC = "rebalance_quadratic"
 )
 
 // BoltStorage is the storage implementation of data.Storage interface
@@ -139,6 +144,12 @@ func NewBoltStorage(path string) (*BoltStorage, error) {
 			return cErr
 		}
 
+		if _, cErr := tx.CreateBucketIfNotExists([]byte(PENDING_REBALANCE_QUADRATIC)); cErr != nil {
+			return cErr
+		}
+		if _, cErr := tx.CreateBucketIfNotExists([]byte(REBALANCE_QUADRATIC)); cErr != nil {
+			return cErr
+		}
 		return nil
 	})
 	if err != nil {
@@ -1577,6 +1588,98 @@ func (self *BoltStorage) GetPWIEquationV2() (metric.PWIEquationRequestV2, error)
 			log.Println("there no equation in PWI_EQUATION_V2, getting from PWI_EQUATION")
 			result, vErr = pwiEquationV1toV2(tx)
 			return vErr
+		}
+		return json.Unmarshal(v, &result)
+	})
+	return result, err
+}
+
+//StorePendingRebalanceQuadratic store pending data (stand for rebalance quadratic equation) to db
+//data byte for json {"KNC": {"a": 0.9, "b": 1.2, "c": 1.4}}
+func (self *BoltStorage) StorePendingRebalanceQuadratic(data []byte) error {
+	timepoint := common.GetTimepoint()
+	err := self.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(PENDING_REBALANCE_QUADRATIC))
+		c := b.Cursor()
+		k, _ := c.First()
+		if k != nil {
+			return errors.New("pending rebalance quadratic equation exists")
+		}
+		return b.Put(boltutil.Uint64ToBytes(timepoint), data)
+	})
+	return err
+}
+
+//GetPendingRebalanceQuadratic return pending rebalance quadratic equation
+func (self *BoltStorage) GetPendingRebalanceQuadratic() (metric.RebalanceQuadraticRequest, error) {
+	var result metric.RebalanceQuadraticRequest
+	err := self.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(PENDING_REBALANCE_QUADRATIC))
+		c := b.Cursor()
+		k, v := c.First()
+		if k == nil {
+			return errors.New("there is no pending rebalance quadratic equation")
+		}
+		return json.Unmarshal(v, &result)
+	})
+	return result, err
+}
+
+//ConfirmRebalanceQuadratic confirm pending equation save it to confirmed bucket
+//and remove pending equation
+func (self *BoltStorage) ConfirmRebalanceQuadratic(data []byte) error {
+	err := self.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(PENDING_REBALANCE_QUADRATIC))
+		c := b.Cursor()
+		k, v := c.First()
+		if v == nil {
+			return errors.New("there is no pending rebalance quadratic equation")
+		}
+		confirmData := metric.RebalanceQuadraticRequest{}
+		if err := json.Unmarshal(data, &confirmData); err != nil {
+			return err
+		}
+		currentData := metric.RebalanceQuadraticRequest{}
+		if err := json.Unmarshal(v, &currentData); err != nil {
+			return err
+		}
+		if eq := reflect.DeepEqual(currentData, confirmData); !eq {
+			return errors.New("confirm data does not match rebalance quadratic pending data")
+		}
+		id := boltutil.Uint64ToBytes(common.GetTimepoint())
+		if uErr := tx.Bucket([]byte(REBALANCE_QUADRATIC)).Put(id, v); uErr != nil {
+			return uErr
+		}
+		// remove pending rebalance quadratic equation
+		return b.Delete(k)
+	})
+	return err
+}
+
+//RemovePendingRebalanceQuadratic remove pending rebalance quadratic equation
+//use when admin want to reject a config for rebalance quadratic equation
+func (self *BoltStorage) RemovePendingRebalanceQuadratic() error {
+	err := self.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(PENDING_REBALANCE_QUADRATIC))
+		c := b.Cursor()
+		k, _ := c.First()
+		if k == nil {
+			return errors.New("there no pending rebalance quadratic equation to delete")
+		}
+		return b.Delete(k)
+	})
+	return err
+}
+
+//GetRebalanceQuadratic return current confirm rebalance quadratic equation
+func (self *BoltStorage) GetRebalanceQuadratic() (metric.RebalanceQuadraticRequest, error) {
+	var result metric.RebalanceQuadraticRequest
+	err := self.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(REBALANCE_QUADRATIC))
+		c := b.Cursor()
+		k, v := c.Last()
+		if k == nil {
+			return errors.New("there is no rebalance quadratic equation")
 		}
 		return json.Unmarshal(v, &result)
 	})

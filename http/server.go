@@ -1771,6 +1771,12 @@ func (self *HTTPServer) register() {
 		v2.POST("/confirm-pwis-equation", self.ConfirmPWIEquationV2)
 		v2.POST("/reject-pwis-equation", self.RejectPWIEquationV2)
 
+		self.r.GET("/rebalance-quadratic", self.GetRebalanceQuadratic)
+		self.r.GET("/pending-rebalance-quadratic", self.GetPendingRebalanceQuadratic)
+		self.r.POST("/set-rebalance-quadratic", self.SetRebalanceQuadratic)
+		self.r.POST("/confirm-rebalance-quadratic", self.ConfirmRebalanceQuadratic)
+		self.r.POST("/reject-rebalance-quadratic", self.RejectRebalanceQuadratic)
+
 		self.r.GET("/get-exchange-status", self.GetExchangesStatus)
 		self.r.POST("/update-exchange-status", self.UpdateExchangeStatus)
 

@@ -119,3 +119,16 @@ func (input PWIEquationRequestV2) IsValid() bool {
 
 	return true
 }
+
+//RebalanceQuadraticEquation represent an equation
+type RebalanceQuadraticEquation struct {
+	RebalanceQuadratic struct {
+		A float64 `json:"a"`
+		B float64 `json:"b"`
+		C float64 `json:"c"`
+	} `json:"rebalance_quadratic"`
+}
+
+//RebalanceQuadraticRequest represent data request to set rebalance quadratic
+//map[token]equation
+type RebalanceQuadraticRequest map[string]RebalanceQuadraticEquation

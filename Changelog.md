@@ -4,6 +4,8 @@
 
 ### Features:
 
+- Add rebalance quadratic API set (#327)
+
 ### Bug fixes:
 
 - Enable errcheck checker and fix all unhandled errors (#307)

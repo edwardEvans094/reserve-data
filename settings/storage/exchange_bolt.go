@@ -35,17 +35,21 @@ func (boltSettingStorage *BoltSettingStorage) GetFee(ex settings.ExchangeName) (
 // StoreFee stores the fee with exchangeName as key into database and return error if occur
 func (boltSettingStorage *BoltSettingStorage) StoreFee(ex settings.ExchangeName, data common.ExchangeFees) error {
 	err := boltSettingStorage.db.Update(func(tx *bolt.Tx) error {
-		b, uErr := tx.CreateBucketIfNotExists([]byte(EXCHANGE_FEE_BUCKET))
-		if uErr != nil {
-			return uErr
-		}
-		dataJSON, uErr := json.Marshal(data)
-		if uErr != nil {
-			return uErr
-		}
-		return b.Put(boltutil.Uint64ToBytes(uint64(ex)), dataJSON)
+		return putFee(tx, ex, data)
 	})
 	return err
+}
+
+func putFee(tx *bolt.Tx, ex settings.ExchangeName, fee common.ExchangeFees) error {
+	b, uErr := tx.CreateBucketIfNotExists([]byte(EXCHANGE_FEE_BUCKET))
+	if uErr != nil {
+		return uErr
+	}
+	dataJSON, uErr := json.Marshal(fee)
+	if uErr != nil {
+		return uErr
+	}
+	return b.Put(boltutil.Uint64ToBytes(uint64(ex)), dataJSON)
 }
 
 // GetMinDeposit returns a map[tokenID]MinDeposit and error if occur
@@ -72,17 +76,21 @@ func (boltSettingStorage *BoltSettingStorage) GetMinDeposit(ex settings.Exchange
 // StoreMinDeposit stores the minDeposit with exchangeName as key into database and return error if occur
 func (boltSettingStorage *BoltSettingStorage) StoreMinDeposit(ex settings.ExchangeName, data common.ExchangesMinDeposit) error {
 	err := boltSettingStorage.db.Update(func(tx *bolt.Tx) error {
-		b, uErr := tx.CreateBucketIfNotExists([]byte(EXCHANGE_MIN_DEPOSIT_BUCKET))
-		if uErr != nil {
-			return uErr
-		}
-		dataJSON, uErr := json.Marshal(data)
-		if uErr != nil {
-			return uErr
-		}
-		return b.Put(boltutil.Uint64ToBytes(uint64(ex)), dataJSON)
+		return putMinDeposit(tx, ex, data)
 	})
 	return err
+}
+
+func putMinDeposit(tx *bolt.Tx, ex settings.ExchangeName, minDeposit common.ExchangesMinDeposit) error {
+	b, uErr := tx.CreateBucketIfNotExists([]byte(EXCHANGE_MIN_DEPOSIT_BUCKET))
+	if uErr != nil {
+		return uErr
+	}
+	dataJSON, uErr := json.Marshal(minDeposit)
+	if uErr != nil {
+		return uErr
+	}
+	return b.Put(boltutil.Uint64ToBytes(uint64(ex)), dataJSON)
 }
 
 // GetDepositAddresses returns a map[tokenID]DepositAddress and error if occur
@@ -107,19 +115,23 @@ func (boltSettingStorage *BoltSettingStorage) GetDepositAddresses(ex settings.Ex
 
 }
 
+func putDepositAddress(tx *bolt.Tx, ex settings.ExchangeName, addrs common.ExchangeAddresses) error {
+	b, uErr := tx.CreateBucketIfNotExists([]byte(EXCHANGE_DEPOSIT_ADDRESS))
+	if uErr != nil {
+		return uErr
+	}
+	dataJSON, uErr := json.Marshal(addrs)
+	if uErr != nil {
+		return uErr
+	}
+	return b.Put(boltutil.Uint64ToBytes(uint64(ex)), dataJSON)
+}
+
 // StoreDepositAddress stores the depositAddress with exchangeName as key into database and
 // return error if occur
 func (boltSettingStorage *BoltSettingStorage) StoreDepositAddress(ex settings.ExchangeName, addrs common.ExchangeAddresses) error {
 	err := boltSettingStorage.db.Update(func(tx *bolt.Tx) error {
-		b, uErr := tx.CreateBucketIfNotExists([]byte(EXCHANGE_DEPOSIT_ADDRESS))
-		if uErr != nil {
-			return uErr
-		}
-		dataJSON, uErr := json.Marshal(addrs)
-		if uErr != nil {
-			return uErr
-		}
-		return b.Put(boltutil.Uint64ToBytes(uint64(ex)), dataJSON)
+		return putDepositAddress(tx, ex, addrs)
 	})
 	return err
 }
@@ -178,17 +190,21 @@ func (boltSettingStorage *BoltSettingStorage) GetExchangeInfo(ex settings.Exchan
 	return result, err
 }
 
+func putExchangeInfo(tx *bolt.Tx, ex settings.ExchangeName, exInfo common.ExchangeInfo) error {
+	b, uErr := tx.CreateBucketIfNotExists([]byte(EXCHANGE_INFO))
+	if uErr != nil {
+		return uErr
+	}
+	dataJSON, uErr := json.Marshal(exInfo)
+	if uErr != nil {
+		return uErr
+	}
+	return b.Put(boltutil.Uint64ToBytes(uint64(ex)), dataJSON)
+}
+
 func (boltSettingStorage *BoltSettingStorage) StoreExchangeInfo(ex settings.ExchangeName, exInfo common.ExchangeInfo) error {
 	err := boltSettingStorage.db.Update(func(tx *bolt.Tx) error {
-		b, uErr := tx.CreateBucketIfNotExists([]byte(EXCHANGE_INFO))
-		if uErr != nil {
-			return uErr
-		}
-		dataJSON, uErr := json.Marshal(exInfo)
-		if uErr != nil {
-			return uErr
-		}
-		return b.Put(boltutil.Uint64ToBytes(uint64(ex)), dataJSON)
+		return putExchangeInfo(tx, ex, exInfo)
 	})
 	return err
 }

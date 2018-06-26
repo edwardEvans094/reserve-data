@@ -44,3 +44,19 @@ func MustGetExchange(id string) Exchange {
 	}
 	return result
 }
+
+type CompositeExchangeSetting struct {
+	ExDepositAddress ExchangeAddresses
+	ExMinDeposit     ExchangesMinDeposit
+	ExFee            ExchangeFees
+	ExInfo           ExchangeInfo
+}
+
+func NewCompositeExchangeSetting(depoAddr ExchangeAddresses, minDep ExchangesMinDeposit, fee ExchangeFees, info ExchangeInfo) *CompositeExchangeSetting {
+	return &CompositeExchangeSetting{
+		ExDepositAddress: depoAddr,
+		ExMinDeposit:     minDep,
+		ExFee:            fee,
+		ExInfo:           info,
+	}
+}

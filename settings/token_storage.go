@@ -32,4 +32,5 @@ type TokenStorage interface {
 	GetExternalTokens() ([]common.Token, error)
 	GetExternalTokenByID(id string) (common.Token, error)
 	GetExternalTokenByAddress(ethereum.Address) (common.Token, error)
+	UpdateTokenWithExchangeSetting(t common.Token, exSetting map[ExchangeName]*common.CompositeExchangeSetting) error
 }

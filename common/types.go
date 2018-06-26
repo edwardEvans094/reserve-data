@@ -68,6 +68,8 @@ func (self ExchangeAddresses) GetData() map[string]ethereum.Address {
 	return dataCopy
 }
 
+// ExchangePrecisionLimit store the precision and limit of a certain token pair on an exchange
+// it is int the struct of [[int int], [float64 float64], [float64 float64], float64]
 type ExchangePrecisionLimit struct {
 	Precision   TokenPairPrecision
 	AmountLimit TokenPairAmountLimit
@@ -125,6 +127,8 @@ func (self FundingFee) GetTokenFee(token string) float64 {
 
 type ExchangesMinDeposit map[string]float64
 
+//ExchangeFees contains the fee for an exchanges
+//It follow the struct of {trading: map[tokenID]float64, funding: {Withdraw: map[tokenID]float64, Deposit: map[tokenID]float64}}
 type ExchangeFees struct {
 	Trading TradingFee
 	Funding FundingFee

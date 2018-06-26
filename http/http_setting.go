@@ -9,6 +9,7 @@ import (
 type Setting interface {
 	GetInternalTokenByID(tokenID string) (common.Token, error)
 	GetActiveTokenByID(tokenID string) (common.Token, error)
+	GetTokenByID(tokenID string) (common.Token, error)
 	GetInternalTokens() ([]common.Token, error)
 	GetAllTokens() ([]common.Token, error)
 	NewTokenPairFromID(base, quote string) (common.TokenPair, error)
@@ -23,4 +24,7 @@ type Setting interface {
 	UpdateDepositAddress(ex settings.ExchangeName, addrs common.ExchangeAddresses) error
 	GetExchangeInfo(ex settings.ExchangeName) (common.ExchangeInfo, error)
 	UpdateExchangeInfo(ex settings.ExchangeName, exInfo common.ExchangeInfo) error
+	GetExchangeStatus() (common.ExchangesStatus, error)
+	UpdateExchangeStatus(data common.ExchangesStatus) error
+	UpdateTokenWithExchangeSetting(common.Token, map[settings.ExchangeName]*common.CompositeExchangeSetting) error
 }

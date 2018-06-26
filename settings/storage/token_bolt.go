@@ -209,3 +209,31 @@ func (boltSettingStorage *BoltSettingStorage) UpdateOneAddress(name settings.Add
 	})
 	return err
 }
+
+//UpdateTokenWithExchangeSetting will attempt to
+func (boltSettingStorage *BoltSettingStorage) UpdateTokenWithExchangeSetting(t common.Token, exSetting map[settings.ExchangeName]*common.CompositeExchangeSetting) error {
+	err := boltSettingStorage.db.Update(func(tx *bolt.Tx) error {
+		if uErr := addTokenByID(tx, t); uErr != nil {
+			return uErr
+		}
+		if uErr := addTokenByAddress(tx, t); uErr != nil {
+			return uErr
+		}
+		for exName, exSett := range exSetting {
+			if uErr := putDepositAddress(tx, exName, exSett.ExDepositAddress); uErr != nil {
+				return uErr
+			}
+			if uErr := putExchangeInfo(tx, exName, exSett.ExInfo); uErr != nil {
+				return uErr
+			}
+			if uErr := putFee(tx, exName, exSett.ExFee); uErr != nil {
+				return uErr
+			}
+			if uErr := putMinDeposit(tx, exName, exSett.ExMinDeposit); uErr != nil {
+				return uErr
+			}
+		}
+		return nil
+	})
+	return err
+}

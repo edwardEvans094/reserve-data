@@ -86,3 +86,7 @@ func (setting *Settings) MustCreateTokenPair(base, quote string) common.TokenPai
 func (setting *Settings) UpdateToken(t common.Token) error {
 	return setting.Tokens.Storage.UpdateToken(t)
 }
+
+func (setting *Settings) UpdateTokenWithExchangeSetting(t common.Token, exSetting map[ExchangeName]*common.CompositeExchangeSetting) error {
+	return setting.Tokens.Storage.UpdateTokenWithExchangeSetting(t, exSetting)
+}

@@ -12,7 +12,9 @@ import (
 	"github.com/KyberNetwork/reserve-data/data"
 	"github.com/KyberNetwork/reserve-data/data/storage"
 	"github.com/KyberNetwork/reserve-data/http/httputil"
-	ethereum "github.com/ethereum/go-ethereum/common"
+	"github.com/KyberNetwork/reserve-data/settings"
+	settingstorage "github.com/KyberNetwork/reserve-data/settings/storage"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -73,31 +75,55 @@ func TestHTTPServerRebalanceQuadratic(t *testing.T) {
 		}`
 	)
 
-	common.RegisterInternalActiveToken(common.Token{ID: "KNC"})
-	common.RegisterInternalActiveToken(common.Token{ID: "ETH"})
-
 	tmpDir, err := ioutil.TempDir("", "test_rebalance_quadratic")
 	if err != nil {
 		t.Fatal(err)
 	}
+	boltSettingStorage, err := settingstorage.NewBoltSettingStorage(filepath.Join(tmpDir, "setting.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokenSetting, err := settings.NewTokenSetting(boltSettingStorage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addressSetting, err := settings.NewAddressSetting(boltSettingStorage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exchangeSetting, err := settings.NewExchangeSetting(boltSettingStorage)
+	if err != nil {
+		t.Fatal(err)
+	}
 
+	setting, err := settings.NewSetting(tokenSetting, addressSetting, exchangeSetting)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
 		if rErr := os.RemoveAll(tmpDir); rErr != nil {
 			t.Error(rErr)
 		}
 	}()
 
+	if uErr := setting.UpdateToken(common.NewToken("KNC", "KyberNetwork", "xxx", 18, true, true, "", "", "")); err != nil {
+		t.Fatal(uErr)
+	}
+	if uErr := setting.UpdateToken(common.NewToken("ETH", "Etherium", "xxx", 18, true, true, "", "", "")); err != nil {
+		t.Error(uErr)
+	}
 	rqStorage, err := storage.NewBoltStorage(filepath.Join(tmpDir, "test.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	s := HTTPServer{
-		app:         data.NewReserveData(rqStorage, nil, nil, nil, nil, nil),
-		core:        core.NewReserveCore(nil, rqStorage, ethereum.Address{}),
+		app:         data.NewReserveData(rqStorage, nil, nil, nil, nil, nil, setting),
+		core:        core.NewReserveCore(nil, rqStorage, setting),
 		metric:      rqStorage,
 		authEnabled: false,
-		r:           gin.Default()}
+		r:           gin.Default(),
+		setting:     setting}
 	s.register()
 
 	var tests = []testCase{

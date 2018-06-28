@@ -20,6 +20,7 @@ type testExchange struct {
 func (self testExchange) ID() common.ExchangeID {
 	return "bittrex"
 }
+
 func (self testExchange) Address(token common.Token) (address ethereum.Address, supported bool) {
 	return ethereum.Address{}, true
 }
@@ -56,6 +57,10 @@ func (self testExchange) UpdateDepositAddress(token common.Token, address string
 
 func (self testExchange) GetTradeHistory(fromTime, toTime uint64) (common.ExchangeTradeHistory, error) {
 	return common.ExchangeTradeHistory{}, nil
+}
+
+func (self testExchange) GetLiveExchangeInfo(pairID common.TokenPairID) (common.ExchangePrecisionLimit, error) {
+	return common.ExchangePrecisionLimit{}, nil
 }
 
 type testBlockchain struct {

@@ -10,7 +10,7 @@ type TokenExchangeSetting struct {
 	MinDeposit     float64
 }
 
-type TokenRequest struct {
+type TokenListing struct {
 	Token    Token
 	Exchange map[string]TokenExchangeSetting
 }

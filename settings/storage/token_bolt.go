@@ -210,15 +210,20 @@ func (boltSettingStorage *BoltSettingStorage) UpdateOneAddress(name settings.Add
 	return err
 }
 
-//UpdateTokenWithExchangeSetting will attempt to
-func (boltSettingStorage *BoltSettingStorage) UpdateTokenWithExchangeSetting(t common.Token, exSetting map[settings.ExchangeName]*common.CompositeExchangeSetting) error {
+// UpdateTokenWithExchangeSetting will attempt to apply all the token and exchange settings
+// as well as remove pending Token listing in one TX. reroll and return err if occur
+func (boltSettingStorage *BoltSettingStorage) UpdateTokenWithExchangeSetting(tokens []common.Token, exSetting map[settings.ExchangeName]*common.CompositeExchangeSetting) error {
 	err := boltSettingStorage.db.Update(func(tx *bolt.Tx) error {
-		if uErr := addTokenByID(tx, t); uErr != nil {
-			return uErr
+		//Apply tokens setting
+		for _, t := range tokens {
+			if uErr := addTokenByID(tx, t); uErr != nil {
+				return uErr
+			}
+			if uErr := addTokenByAddress(tx, t); uErr != nil {
+				return uErr
+			}
 		}
-		if uErr := addTokenByAddress(tx, t); uErr != nil {
-			return uErr
-		}
+		//Apply exchanges setting
 		for exName, exSett := range exSetting {
 			if uErr := putDepositAddress(tx, exName, exSett.ExDepositAddress); uErr != nil {
 				return uErr
@@ -233,7 +238,72 @@ func (boltSettingStorage *BoltSettingStorage) UpdateTokenWithExchangeSetting(t c
 				return uErr
 			}
 		}
+		//delete pending token listings
+		if uErr := deletePendingTokenListings(tx); uErr != nil {
+			return uErr
+		}
 		return nil
+	})
+	return err
+}
+
+func (boltSettingStorage *BoltSettingStorage) StorePendingTokenListings(trs map[string]common.TokenListing) error {
+	err := boltSettingStorage.db.Update(func(tx *bolt.Tx) error {
+		b, uErr := tx.CreateBucketIfNotExists([]byte(PENDING_TOKEN_REQUEST))
+		if uErr != nil {
+			return uErr
+		}
+		for tokenID, tr := range trs {
+			dataJSON, vErr := json.Marshal(tr)
+			if vErr != nil {
+				return vErr
+			}
+			if vErr = b.Put([]byte(tokenID), dataJSON); vErr != nil {
+				return vErr
+			}
+		}
+		return nil
+	})
+	return err
+}
+
+func (boltSettingStorage *BoltSettingStorage) GetPendingTokenListings() (map[string]common.TokenListing, error) {
+	result := make(map[string]common.TokenListing)
+	err := boltSettingStorage.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(PENDING_TOKEN_REQUEST))
+		if b == nil {
+			return fmt.Errorf("Bucket %s does not exist yet", PENDING_TOKEN_REQUEST)
+		}
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			var tr common.TokenListing
+			if uErr := json.Unmarshal(v, &tr); uErr != nil {
+				return uErr
+			}
+			result[string(k)] = tr
+		}
+		return nil
+	})
+	return result, err
+}
+
+func deletePendingTokenListings(tx *bolt.Tx) error {
+	b := tx.Bucket([]byte(PENDING_TOKEN_REQUEST))
+	if b == nil {
+		return fmt.Errorf("Bucket %s does not exist yet", PENDING_TOKEN_REQUEST)
+	}
+	c := b.Cursor()
+	for k, _ := c.First(); k != nil; k, _ = c.Next() {
+		if uErr := b.Delete(k); uErr != nil {
+			return uErr
+		}
+	}
+	return nil
+}
+
+func (boltSettingStorage *BoltSettingStorage) RemovePendingTokenListings() error {
+	err := boltSettingStorage.db.Update(func(tx *bolt.Tx) error {
+		return deletePendingTokenListings(tx)
 	})
 	return err
 }

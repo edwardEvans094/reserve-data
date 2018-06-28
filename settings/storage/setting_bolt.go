@@ -17,6 +17,7 @@ const (
 	EXCHANGE_INFO               string = "exchange_info"
 	EXCHANGE_STATUS             string = "exchange_status"
 	EXCHANGE_NOTIFICATIONS      string = "exchange_notifications"
+	PENDING_TOKEN_REQUEST       string = "pending_token_request"
 )
 
 type FilterFunction func(common.Token) bool
@@ -80,6 +81,9 @@ func NewBoltSettingStorage(dbPath string) (*BoltSettingStorage, error) {
 			return uErr
 		}
 		if _, uErr := tx.CreateBucketIfNotExists([]byte(EXCHANGE_NOTIFICATIONS)); uErr != nil {
+			return uErr
+		}
+		if _, uErr := tx.CreateBucketIfNotExists([]byte(PENDING_TOKEN_REQUEST)); uErr != nil {
 			return uErr
 		}
 		return nil

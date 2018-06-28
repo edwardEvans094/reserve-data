@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"reflect"
 
 	"github.com/KyberNetwork/reserve-data/common"
 	"github.com/KyberNetwork/reserve-data/http/httputil"
@@ -43,6 +45,23 @@ func (self *HTTPServer) reloadTokenIndices(newToken common.Token, active bool) e
 	return nil
 }
 
+func (self *HTTPServer) reloadMultipleTokensIndices(tokenListings map[string]common.TokenListing) error {
+	tokens, err := self.setting.GetInternalTokens()
+	if err != nil {
+		return err
+	}
+	for _, tokenListing := range tokenListings {
+		token := tokenListing.Token
+		if token.Internal {
+			tokens = append(tokens, token)
+		}
+	}
+	if err = self.blockchain.LoadAndSetTokenIndices(common.GetTokenAddressesList(tokens)); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (self *HTTPServer) EnsureRunningExchange(ex string) (settings.ExchangeName, error) {
 	exName, ok := settings.ExchangTypeValues()[ex]
 	if !ok {
@@ -62,110 +81,243 @@ func (self *HTTPServer) EnsureRunningExchange(ex string) (settings.ExchangeName,
 	return exName, nil
 }
 
-func (self *HTTPServer) PrepareExchangeDepositAddress(tokenID, depAddrStr string, exName settings.ExchangeName) (common.ExchangeAddresses, error) {
-	depAddr := ethereum.HexToAddress(depAddrStr)
-	depAddrs, err := self.setting.GetDepositAddresses(exName)
-	if err != nil {
-		return depAddrs, err
-	}
-	depAddrs[tokenID] = depAddr
-	return depAddrs, nil
-}
-
-func (self *HTTPServer) PrepareExchangeInfo(epls map[common.TokenPairID]common.ExchangePrecisionLimit, exName settings.ExchangeName) (common.ExchangeInfo, error) {
-	exInfos, err := self.setting.GetExchangeInfo(exName)
-	if err != nil {
-		return exInfos, err
-	}
-	for tokenPairID, epl := range epls {
-		exInfos[tokenPairID] = epl
-	}
-	return exInfos, nil
-}
-
-func (self *HTTPServer) PrepareExchangeFees(tokenID string, tokenFee common.TokenFee, exName settings.ExchangeName) (common.ExchangeFees, error) {
+// getCompositeExchangeSetting will query the current exchange setting with key ExName.
+// return a struct contain all
+func (self *HTTPServer) getCompositeExchangeSetting(exName settings.ExchangeName) (*common.CompositeExchangeSetting, error) {
 	exFee, err := self.setting.GetFee(exName)
 	if err != nil {
-		return exFee, err
+		return nil, err
 	}
-	exFee.Trading[tokenID] = tokenFee.Trading
-	exFee.Funding.Deposit[tokenID] = tokenFee.Deposit
-	exFee.Funding.Withdraw[tokenID] = tokenFee.WithDraw
-	return exFee, err
-}
-
-func (self *HTTPServer) PrepareExchangeMinDeposit(tokenID string, minDeposit float64, exName settings.ExchangeName) (common.ExchangesMinDeposit, error) {
 	exMinDep, err := self.setting.GetMinDeposit(exName)
 	if err != nil {
-		return exMinDep, err
+		return nil, err
 	}
-	exMinDep[tokenID] = minDeposit
-	return exMinDep, nil
+	exInfos, err := self.setting.GetExchangeInfo(exName)
+	if err != nil {
+		return nil, err
+	}
+	depAddrs, err := self.setting.GetDepositAddresses(exName)
+	if err != nil {
+		return nil, err
+	}
+	return common.NewCompositeExchangeSetting(depAddrs, exMinDep, exFee, exInfos), nil
 }
 
-func (self *HTTPServer) ListToken(c *gin.Context) {
-	postForm, ok := self.Authenticated(c, []string{"data"}, []Permission{RebalancePermission, ConfigurePermission})
+func (self *HTTPServer) PrepareExchangeSetting(token common.Token, tokExSetts map[string]common.TokenExchangeSetting, preparedExchangeSetting *map[settings.ExchangeName]*common.CompositeExchangeSetting) error {
+	for ex, tokExSett := range tokExSetts {
+		exName, err := self.EnsureRunningExchange(ex)
+		if err != nil {
+			return fmt.Errorf("Exchange %s is not in current deployment", ex)
+		}
+		comExSet, ok := (*preparedExchangeSetting)[exName]
+		//create a current compositeExchangeSetting from setting if it does not exist yet
+		if !ok {
+			comExSet, err = self.getCompositeExchangeSetting(exName)
+			if err != nil {
+				return err
+			}
+		}
+		//update exchange Deposite Address for compositeExchangeSetting
+		comExSet.ExDepositAddress[token.ID] = ethereum.HexToAddress(tokExSett.DepositAddress)
+
+		//update Exchange Info for compositeExchangeSetting
+		for pairID, epl := range tokExSett.PrecisionLimit {
+			comExSet.ExInfo[pairID] = epl
+		}
+
+		//Update Exchange Fee for compositeExchangeSetting
+		comExSet.ExFee.Trading[token.ID] = tokExSett.Fee.Trading
+		comExSet.ExFee.Funding.Deposit[token.ID] = tokExSett.Fee.Deposit
+		comExSet.ExFee.Funding.Withdraw[token.ID] = tokExSett.Fee.WithDraw
+
+		//Update Exchange Min deposit for compositeExchangeSetting
+		comExSet.ExMinDeposit[token.ID] = tokExSett.MinDeposit
+
+		(*preparedExchangeSetting)[exName] = comExSet
+	}
+	return nil
+}
+
+func (self *HTTPServer) ConfirmTokenListing(c *gin.Context) {
+	postForm, ok := self.Authenticated(c, []string{"data"}, []Permission{ConfigurePermission})
 	if !ok {
 		return
 	}
 	data := []byte(postForm.Get("data"))
-	var tokenRequest common.TokenRequest
-	if err := json.Unmarshal(data, &tokenRequest); err != nil {
-		httputil.ResponseFailure(c, httputil.WithError(err))
+	var tokenListings map[string]common.TokenListing
+	if err := json.Unmarshal(data, &tokenListings); err != nil {
+		httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("cant not unmarshall token request %s", err.Error())))
 		return
-	}
-	token := tokenRequest.Token
-	//reload token indices if the token is Internal
-	if token.Internal {
-		if err := self.reloadTokenIndices(token, token.Internal); err != nil {
-			httputil.ResponseFailure(c, httputil.WithError(err))
-			return
-		}
-	}
-	//prepare all the exchange setting.
-	preparedExchangeSetting := make(map[settings.ExchangeName]*common.CompositeExchangeSetting)
-	for ex, exTokenSetting := range tokenRequest.Exchange {
-		exName, uErr := self.EnsureRunningExchange(ex)
-		if uErr != nil {
-			httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Exchange %s is not in current deployment", ex)))
-			return
-		}
-
-		exAddresses, uErr := self.PrepareExchangeDepositAddress(token.ID, exTokenSetting.DepositAddress, exName)
-		if uErr != nil {
-			httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Can not prepare exchange address for token on exchange %s (%s)", ex, uErr)))
-			return
-		}
-		exInfo, uErr := self.PrepareExchangeInfo(exTokenSetting.PrecisionLimit, exName)
-		if uErr != nil {
-			httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Can not prepare exchange info for token on exchange %s (%s)", ex, uErr)))
-			return
-		}
-		exFees, uErr := self.PrepareExchangeFees(token.ID, exTokenSetting.Fee, exName)
-		if uErr != nil {
-			httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Can not prepare exchange fee for token on exchange %s (%s)", ex, uErr)))
-			return
-		}
-		exMinDeposit, uErr := self.PrepareExchangeMinDeposit(token.ID, exTokenSetting.MinDeposit, exName)
-		if uErr != nil {
-			httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Can not prepare exchange min deposit for token on exchange %s (%s)", ex, uErr)))
-			return
-		}
-		preparedExchangeSetting[exName] = common.NewCompositeExchangeSetting(exAddresses, exMinDeposit, exFees, exInfo)
 	}
 	pdPWI, err := self.metric.GetPendingPWIEquationV2()
 	if err != nil {
-		httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Can not get pendingPWIEquation %s", err)))
-		return
+		log.Printf("WARNING: can not get Pending PWIEquation v2, this will only allow listing non-internal token")
 	}
-	if _, ok := pdPWI[token.ID]; !ok {
-		httputil.ResponseFailure(c, httputil.WithReason("The Token is not in current pending PWIEquation "))
-		return
+	targetQty, err := self.metric.GetPendingTargetQtyV2()
+	if err != nil {
+		log.Printf("WARNING: can not get Pending TargetQty v2, this will only allow listing non-internal token")
 	}
-	if err := self.setting.UpdateTokenWithExchangeSetting(token, preparedExchangeSetting); err != nil {
+	pendingTLs, err := self.setting.GetPendingTokenListings()
+	if err != nil {
+		httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Can not get pending token listing (%s)", err.Error())))
+	}
+
+	preparedExchangeSetting := make(map[settings.ExchangeName]*common.CompositeExchangeSetting)
+	preparedToken := []common.Token{}
+
+	for tokenID, tokenListing := range tokenListings {
+		token := tokenListing.Token
+		preparedToken = append(preparedToken, token)
+		//check if there is the token in pending PWIequation
+		if _, ok := pdPWI[token.ID]; (token.Internal) && (!ok) {
+			httputil.ResponseFailure(c, httputil.WithReason("The Token is not in current pendingPWIEquation "))
+			return
+		}
+		//check if there is the token in pending targetqty
+		if _, ok := targetQty[token.ID]; (token.Internal) && (!ok) {
+			httputil.ResponseFailure(c, httputil.WithReason("The Token is not in current PendingTargetQty "))
+			return
+		}
+
+		//check if the token is available in pending token listing and is deep equal to it.
+		pendingTL, avail := pendingTLs[tokenID]
+		if !avail {
+			httputil.ResponseFailure(c, httputil.WithReason("Token %s is not avaiale in pending token listing"))
+			return
+		}
+		if eq := reflect.DeepEqual(pendingTL, tokenListing); !eq {
+			httputil.ResponseFailure(c, httputil.WithReason("Confirm and pending token listing request are not equal"))
+			return
+		}
+		if uErr := self.PrepareExchangeSetting(token, tokenListing.Exchange, &preparedExchangeSetting); uErr != nil {
+			httputil.ResponseFailure(c, httputil.WithError(uErr))
+			return
+		}
+	}
+
+	//reload token indices if the token is Internal
+	if err = self.reloadMultipleTokensIndices(tokenListings); err != nil {
 		httputil.ResponseFailure(c, httputil.WithError(err))
+		return
+	}
+
+	// Apply the change into setting database
+	if err = self.setting.ApplyTokenWithExchangeSetting(preparedToken, preparedExchangeSetting); err != nil {
+		httputil.ResponseFailure(c, httputil.WithError(err))
+		return
+	}
+
+	httputil.ResponseSuccess(c)
+
+}
+
+func (self *HTTPServer) RejectTokenListing(c *gin.Context) {
+	_, ok := self.Authenticated(c, []string{}, []Permission{ConfirmConfPermission})
+	if !ok {
+		return
+	}
+	if err := self.setting.RemovePendingTokenListings(); err != nil {
+		httputil.ResponseFailure(c, httputil.WithError(err))
+		return
 	}
 	httputil.ResponseSuccess(c)
+}
+
+// ListToken will pre-process the token request and put into pending token request
+// It will not apply any change to DB
+func (self *HTTPServer) ListToken(c *gin.Context) {
+	postForm, ok := self.Authenticated(c, []string{"data"}, []Permission{ConfigurePermission})
+	if !ok {
+		return
+	}
+	data := []byte(postForm.Get("data"))
+	TokenListings := make(map[string]common.TokenListing)
+	if err := json.Unmarshal(data, &TokenListings); err != nil {
+		httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("cant not unmarshall token request %s", err.Error())))
+		return
+	}
+
+	pdPWI, err := self.metric.GetPendingPWIEquationV2()
+	if err != nil {
+		log.Printf("WARNING: can not get Pending PWIEquation v2, this will only allow listing non-internal token")
+	}
+	targetQty, err := self.metric.GetPendingTargetQtyV2()
+	if err != nil {
+		log.Printf("WARNING: can not get Pending TargetQty v2, this will only allow listing non-internal token")
+	}
+	// prepare each TokenListing instance for individual token
+	for tokenID, TokenListing := range TokenListings {
+		token := TokenListing.Token
+		// To list token, its active status must be true
+		if !token.Active {
+			httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("The listing token %s is inactive", tokenID)))
+			return
+		}
+		//check if there is the token in pending PWIequation
+		if _, ok := pdPWI[token.ID]; (token.Internal) && (!ok) {
+			httputil.ResponseFailure(c, httputil.WithReason("The Token is not in current pendingPWIEquation "))
+			return
+		}
+
+		//check if there is the token in pending targetqty
+		if _, ok := targetQty[token.ID]; (token.Internal) && (!ok) {
+			httputil.ResponseFailure(c, httputil.WithReason("The Token is not in current PendingTargetQty "))
+			return
+		}
+
+		//verify exchange status and exchange precision limit for each exchange
+
+		for ex, tokExSett := range TokenListing.Exchange {
+			_, uErr := self.EnsureRunningExchange(ex)
+			if uErr != nil {
+				httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Exchange %s is not in current deployment", ex)))
+				return
+			}
+			//query exchangeprecisionlimit from exchange for the pair token-ETH
+			pairID := common.NewTokenPairID(token.ID, "ETH")
+
+			// If the pair is not in current token listing request, query it from exchange
+			_, ok := tokExSett.PrecisionLimit[pairID]
+			if !ok {
+				exchange, uErr := common.GetExchange(ex)
+				if uErr != nil {
+					httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Can not get exchange instance %s (%s)", ex, uErr)))
+					return
+				}
+				epl, uErr := exchange.GetLiveExchangeInfo(pairID)
+				if (uErr != nil) && (!ok) {
+					httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Can not prepare exchange info for token on exchange %s (%s). The exchange precision limit of pair %s-ETH must available either on exchange or manually send within the request", ex, uErr, tokenID)))
+					return
+				}
+				if tokExSett.PrecisionLimit == nil {
+					tokExSett.PrecisionLimit = make(map[common.TokenPairID]common.ExchangePrecisionLimit)
+				}
+				tokExSett.PrecisionLimit[pairID] = epl
+			}
+			TokenListing.Exchange[ex] = tokExSett
+		}
+		TokenListings[tokenID] = TokenListing
+	}
+	if err := self.setting.UpdatePendingTokenListings(TokenListings); err != nil {
+		httputil.ResponseFailure(c, httputil.WithError(err))
+		return
+	}
+	httputil.ResponseSuccess(c)
+	return
+}
+
+func (self *HTTPServer) GetPendingTokenListings(c *gin.Context) {
+	_, ok := self.Authenticated(c, []string{}, []Permission{RebalancePermission, ConfigurePermission, ReadOnlyPermission, ConfirmConfPermission})
+	if !ok {
+		return
+	}
+	data, err := self.setting.GetPendingTokenListings()
+	if err != nil {
+		httputil.ResponseFailure(c, httputil.WithError(err))
+		return
+	}
+	httputil.ResponseSuccess(c, httputil.WithData(data))
+	return
 }
 
 // UpdateToken update minor independent details about a token
@@ -186,18 +338,18 @@ func (self *HTTPServer) UpdateToken(c *gin.Context) {
 		httputil.ResponseFailure(c, httputil.WithError(err))
 		return
 	}
-	//We only concern reloading indices if the token is Internal
+	//reload token indices if the token is Internal
 	if token.Internal {
 		if err := self.reloadTokenIndices(token, token.Internal); err != nil {
 			httputil.ResponseFailure(c, httputil.WithError(err))
 			return
 		}
 	}
-
 	if err := self.setting.UpdateToken(token); err != nil {
 		httputil.ResponseFailure(c, httputil.WithError(err))
 		return
 	}
+
 	httputil.ResponseSuccess(c)
 }
 

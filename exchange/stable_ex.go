@@ -48,6 +48,10 @@ func (self *StableEx) GetInfo() (common.ExchangeInfo, error) {
 	return self.setting.GetExchangeInfo(settings.StableExchange)
 }
 
+func (self *StableEx) GetExchangeLiveInfo(pair common.TokenPairID) (common.ExchangePrecisionLimit, error) {
+	return common.ExchangePrecisionLimit{}, errors.New("Stable exchange doesn't support live token")
+}
+
 func (self *StableEx) GetExchangeInfo(pair common.TokenPairID) (common.ExchangePrecisionLimit, error) {
 	exInfo, err := self.setting.GetExchangeInfo(settings.StableExchange)
 	if err != nil {

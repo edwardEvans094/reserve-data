@@ -90,19 +90,36 @@ func (self *Huobi) UpdateDepositAddress(token common.Token, address string) erro
 	return self.setting.UpdateDepositAddress(settings.Huobi, *addrs)
 }
 
-func (self *Huobi) UpdatePrecisionLimit(pair common.TokenPairID, symbols HuobiExchangeInfo, exInfo *common.ExchangeInfo) {
+// GetLiveExchangeInfo querry the Exchange Endpoint for exchange precision and limit of a certain pair ID
+// It return error if occurs.
+func (self *Huobi) GetLiveExchangeInfo(tokenPairID common.TokenPairID) (common.ExchangePrecisionLimit, error) {
+	var result common.ExchangePrecisionLimit
+	exchangeInfo, err := self.interf.GetExchangeInfo()
+	if err != nil {
+		return result, err
+	}
+	result, ok := self.getPrecisionLimitFromSymbols(tokenPairID, exchangeInfo)
+	if !ok {
+		return result, fmt.Errorf("Huobi Exchange Info reply doesn't contain token pair %s", string(tokenPairID))
+	}
+	return result, nil
+}
+
+// getPrecisionLimitFromSymbols find the pairID amongs symbols from exchanges,
+// return ExchangePrecisionLimit of that pair and true if the pairID exist amongs symbols, false if otherwise
+func (self *Huobi) getPrecisionLimitFromSymbols(pair common.TokenPairID, symbols HuobiExchangeInfo) (common.ExchangePrecisionLimit, bool) {
+	var result common.ExchangePrecisionLimit
 	pairName := strings.ToUpper(strings.Replace(string(pair), "-", "", 1))
 	for _, symbol := range symbols.Data {
 		symbolName := strings.ToUpper(symbol.Base + symbol.Quote)
 		if symbolName == pairName {
-			exchangePrecisionLimit := common.ExchangePrecisionLimit{}
-			exchangePrecisionLimit.Precision.Amount = symbol.AmountPrecision
-			exchangePrecisionLimit.Precision.Price = symbol.PricePrecision
-			exchangePrecisionLimit.MinNotional = 0.02
-			(*exInfo)[pair] = exchangePrecisionLimit
-			break
+			result.Precision.Amount = symbol.AmountPrecision
+			result.Precision.Price = symbol.PricePrecision
+			result.MinNotional = 0.02
+			return result, true
 		}
 	}
+	return result, false
 }
 
 func (self *Huobi) UpdatePairsPrecision() error {
@@ -118,7 +135,11 @@ func (self *Huobi) UpdatePairsPrecision() error {
 		return errors.New("Exchange info of Huobi is nil")
 	}
 	for pair := range exInfo.GetData() {
-		self.UpdatePrecisionLimit(pair, exchangeInfo, &exInfo)
+		epl, exist := self.getPrecisionLimitFromSymbols(pair, exchangeInfo)
+		if !exist {
+			return fmt.Errorf("Huobi Exchange Info reply doesn't contain token pair %s", pair)
+		}
+		exInfo[pair] = epl
 	}
 	return self.setting.UpdateExchangeInfo(settings.Huobi, exInfo)
 }

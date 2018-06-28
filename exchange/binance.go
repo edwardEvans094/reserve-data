@@ -84,45 +84,63 @@ func (self *Binance) precisionFromStepSize(stepSize string) int {
 	return 0
 }
 
-func (self *Binance) UpdatePrecisionLimit(pair common.TokenPairID, symbols []BinanceSymbol, exInfo *common.ExchangeInfo) {
+// GetLiveExchangeInfo querry the Exchange Endpoint for exchange precision and limit of a certain pair ID
+// It return error if occurs.
+func (self *Binance) GetLiveExchangeInfo(tokenPairID common.TokenPairID) (common.ExchangePrecisionLimit, error) {
+	var result common.ExchangePrecisionLimit
+	exchangeInfo, err := self.interf.GetExchangeInfo()
+	if err != nil {
+		return result, err
+	}
+	symbols := exchangeInfo.Symbols
+	result, ok := self.getPrecisionLimitFromSymbols(tokenPairID, symbols)
+	if !ok {
+		return result, fmt.Errorf("Binance Exchange Info reply doesn't contain token pair %s", string(tokenPairID))
+	}
+	return result, nil
+}
+
+// getPrecisionLimitFromSymbols find the pairID amongs symbols from exchanges,
+// return ExchangePrecisionLimit of that pair and true if the pairID exist amongs symbols, false if otherwise
+func (self *Binance) getPrecisionLimitFromSymbols(pair common.TokenPairID, symbols []BinanceSymbol) (common.ExchangePrecisionLimit, bool) {
+	var result common.ExchangePrecisionLimit
 	pairName := strings.ToUpper(strings.Replace(string(pair), "-", "", 1))
 	for _, symbol := range symbols {
 		if strings.ToUpper(symbol.Symbol) == pairName {
 			//update precision
-			exchangePrecisionLimit := common.ExchangePrecisionLimit{}
-			exchangePrecisionLimit.Precision.Amount = symbol.BaseAssetPrecision
-			exchangePrecisionLimit.Precision.Price = symbol.QuotePrecision
+			result.Precision.Amount = symbol.BaseAssetPrecision
+			result.Precision.Price = symbol.QuotePrecision
 			// update limit
 			for _, filter := range symbol.Filters {
 				if filter.FilterType == "LOT_SIZE" {
 					// update amount min
 					minQuantity, _ := strconv.ParseFloat(filter.MinQuantity, 64)
-					exchangePrecisionLimit.AmountLimit.Min = minQuantity
+					result.AmountLimit.Min = minQuantity
 					// update amount max
 					maxQuantity, _ := strconv.ParseFloat(filter.MaxQuantity, 64)
-					exchangePrecisionLimit.AmountLimit.Max = maxQuantity
-					exchangePrecisionLimit.Precision.Amount = self.precisionFromStepSize(filter.StepSize)
+					result.AmountLimit.Max = maxQuantity
+					result.Precision.Amount = self.precisionFromStepSize(filter.StepSize)
 				}
 
 				if filter.FilterType == "PRICE_FILTER" {
 					// update price min
 					minPrice, _ := strconv.ParseFloat(filter.MinPrice, 64)
-					exchangePrecisionLimit.PriceLimit.Min = minPrice
+					result.PriceLimit.Min = minPrice
 					// update price max
 					maxPrice, _ := strconv.ParseFloat(filter.MaxPrice, 64)
-					exchangePrecisionLimit.PriceLimit.Max = maxPrice
-					exchangePrecisionLimit.Precision.Price = self.precisionFromStepSize(filter.TickSize)
+					result.PriceLimit.Max = maxPrice
+					result.Precision.Price = self.precisionFromStepSize(filter.TickSize)
 				}
 
 				if filter.FilterType == "MIN_NOTIONAL" {
 					minNotional, _ := strconv.ParseFloat(filter.MinNotional, 64)
-					exchangePrecisionLimit.MinNotional = minNotional
+					result.MinNotional = minNotional
 				}
 			}
-			(*exInfo)[pair] = exchangePrecisionLimit
-			break
+			return result, true
 		}
 	}
+	return result, false
 }
 
 func (self *Binance) UpdatePairsPrecision() error {
@@ -139,7 +157,11 @@ func (self *Binance) UpdatePairsPrecision() error {
 		return errors.New("Exchange info of Binance is nil")
 	}
 	for pair := range exInfo.GetData() {
-		self.UpdatePrecisionLimit(pair, symbols, &exInfo)
+		epl, exist := self.getPrecisionLimitFromSymbols(pair, symbols)
+		if !exist {
+			return fmt.Errorf("Binance Exchange Info reply doesn't contain token pair %s", pair)
+		}
+		exInfo[pair] = epl
 	}
 	return self.setting.UpdateExchangeInfo(settings.Binance, exInfo)
 }

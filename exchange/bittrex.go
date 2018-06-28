@@ -79,34 +79,41 @@ func (self *Bittrex) UpdateDepositAddress(token common.Token, address string) er
 	return self.setting.UpdateDepositAddress(settings.Bittrex, *addrs)
 }
 
-func (self *Bittrex) UpdatePrecisionLimit(pair common.TokenPairID, symbols []BittPairInfo, exInfo *common.ExchangeInfo) {
+// GetLiveExchangeInfo querry the Exchange Endpoint for exchange precision and limit of a certain pair ID
+// It return error if occurs.
+func (self *Bittrex) GetLiveExchangeInfo(tokenPairID common.TokenPairID) (common.ExchangePrecisionLimit, error) {
+	var result common.ExchangePrecisionLimit
+	exchangeInfo, err := self.interf.GetExchangeInfo()
+
+	if err != nil {
+		return result, err
+	}
+	symbols := exchangeInfo.Pairs
+	result, ok := self.getPrecisionLimitFromSymbols(tokenPairID, symbols)
+	if !ok {
+		return result, fmt.Errorf("Bittrex Exchange Info reply doesn't contain token pair %s", string(tokenPairID))
+	}
+	return result, nil
+}
+
+// getPrecisionLimitFromSymbols find the pairID amongs symbols from exchanges,
+// return ExchangePrecisionLimit of that pair and true if the pairID exist amongs symbols, false if otherwise
+func (self *Bittrex) getPrecisionLimitFromSymbols(pair common.TokenPairID, symbols []BittPairInfo) (common.ExchangePrecisionLimit, bool) {
+	var result common.ExchangePrecisionLimit
 	pairName := strings.ToUpper(strings.Replace(string(pair), "-", "", 1))
 	for _, symbol := range symbols {
 		symbolName := strings.ToUpper(symbol.Base + symbol.Quote)
 		if symbolName == pairName {
-			exchangePrecisionLimit := common.ExchangePrecisionLimit{}
 			//update precision
-			exchangePrecisionLimit.Precision.Amount = 8
-			exchangePrecisionLimit.Precision.Price = 8
+			result.Precision.Amount = 8
+			result.Precision.Price = 8
 			// update limit
-			exchangePrecisionLimit.AmountLimit.Min = symbol.MinAmount
-			exchangePrecisionLimit.MinNotional = 0.02
-			(*exInfo)[pair] = exchangePrecisionLimit
-			break
+			result.AmountLimit.Min = symbol.MinAmount
+			result.MinNotional = 0.02
+			return result, true
 		}
 	}
-}
-
-func (self *Bittrex) GetExchangeInfo(pair common.TokenPairID) (common.ExchangePrecisionLimit, error) {
-	exInfo, err := self.setting.GetExchangeInfo(settings.Bittrex)
-	if err != nil {
-		return common.ExchangePrecisionLimit{}, err
-	}
-	return exInfo.Get(pair)
-}
-
-func (self *Bittrex) GetInfo() (common.ExchangeInfo, error) {
-	return self.setting.GetExchangeInfo(settings.Bittrex)
+	return result, false
 }
 
 func (self *Bittrex) UpdatePairsPrecision() error {
@@ -123,9 +130,25 @@ func (self *Bittrex) UpdatePairsPrecision() error {
 		return errors.New("Exchange info of Bittrex is nil")
 	}
 	for pair := range exInfo.GetData() {
-		self.UpdatePrecisionLimit(pair, symbols, &exInfo)
+		epl, exist := self.getPrecisionLimitFromSymbols(pair, symbols)
+		if !exist {
+			return fmt.Errorf("Bittrex Exchange Info reply doesn't contain token pair %s", pair)
+		}
+		exInfo[pair] = epl
 	}
 	return self.setting.UpdateExchangeInfo(settings.Binance, exInfo)
+}
+
+func (self *Bittrex) GetExchangeInfo(pair common.TokenPairID) (common.ExchangePrecisionLimit, error) {
+	exInfo, err := self.setting.GetExchangeInfo(settings.Bittrex)
+	if err != nil {
+		return common.ExchangePrecisionLimit{}, err
+	}
+	return exInfo.Get(pair)
+}
+
+func (self *Bittrex) GetInfo() (common.ExchangeInfo, error) {
+	return self.setting.GetExchangeInfo(settings.Bittrex)
 }
 
 // ID must return the exact string or else simulation will fail

@@ -83,8 +83,8 @@ func (self *BaseBlockchain) GetMinedNonce(operator string) (uint64, error) {
 	}
 }
 
-func (self *BaseBlockchain) GetNextNonce(operator string) (*big.Int, error) {
-	n := self.GetOperator(operator).NonceCorpus
+func (self *BaseBlockchain) GetNextNonce(operator *Operator) (*big.Int, error) {
+	n := operator.NonceCorpus
 	var nonce *big.Int
 	var err error
 	for i := 0; i < 3; i++ {
@@ -171,11 +171,7 @@ func (self *BaseBlockchain) transactTx(context context.Context, opts TxOpts, con
 	if value == nil {
 		value = new(big.Int)
 	}
-	var nonce uint64
-	if opts.Nonce == nil {
-		return nil, errors.New("nonce must be specified")
-	}
-	nonce = opts.Nonce.Uint64()
+
 	// Figure out the gas allowance and gas price values
 	if opts.GasPrice == nil {
 		return nil, errors.New("gas price must be specified")
@@ -199,6 +195,14 @@ func (self *BaseBlockchain) transactTx(context context.Context, opts TxOpts, con
 		// add gas limit by 50K gas
 		gasLimit += 50000
 	}
+	var nonce uint64
+	if opts.Nonce == nil {
+		opts.Nonce, err = self.GetNextNonce(opts.Operator)
+		if err != nil {
+			return nil, errors.New("nonce must be specified")
+		}
+	}
+	nonce = opts.Nonce.Uint64()
 	// Create the transaction, sign it and schedule it for execution
 	var rawTx *types.Transaction
 	if contract.Big().Cmp(ethereum.Big0) == 0 {
@@ -223,9 +227,7 @@ func (self *BaseBlockchain) GetTxOpts(op string, nonce *big.Int, gasPrice *big.I
 	result := TxOpts{}
 	operator := self.GetOperator(op)
 	var err error
-	if nonce == nil {
-		nonce, err = self.GetNextNonce(op)
-	}
+
 	if err != nil {
 		return result, err
 	}

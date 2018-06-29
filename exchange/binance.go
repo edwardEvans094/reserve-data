@@ -84,7 +84,7 @@ func (self *Binance) precisionFromStepSize(stepSize string) int {
 	return 0
 }
 
-// GetLiveExchangeInfo querry the Exchange Endpoint for exchange precision and limit of a certain pair ID
+// GetLiveExchangeInfo queries the Exchange Endpoint for exchange precision and limit of a certain pair ID
 // It return error if occurs.
 func (self *Binance) GetLiveExchangeInfo(tokenPairID common.TokenPairID) (common.ExchangePrecisionLimit, error) {
 	var result common.ExchangePrecisionLimit

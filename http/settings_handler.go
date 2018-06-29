@@ -182,7 +182,7 @@ func (self *HTTPServer) ConfirmTokenListing(c *gin.Context) {
 		//check if the token is available in pending token listing and is deep equal to it.
 		pendingTL, avail := pendingTLs[tokenID]
 		if !avail {
-			httputil.ResponseFailure(c, httputil.WithReason("Token %s is not avaiale in pending token listing"))
+			httputil.ResponseFailure(c, httputil.WithReason("Token %s is not available in pending token listing"))
 			return
 		}
 		if eq := reflect.DeepEqual(pendingTL, tokenListing); !eq {

@@ -1571,6 +1571,332 @@ response
   }
 ```
 
+### update token - (signing required)
+POST request
+Post form: {"data" : "JSON enconding of token Object"}
+```
+<host>:8000/update-token
+```
+
+eg
+
+```
+curl -X "POST" "http://localhost:8000/update-token" \
+     -H 'Content-Type: application/x-www-form-urlencoded'
+     --data-urlencode "data={ 
+      \"id\" :\"LXXX\",
+      \"name\": \"Chain Link\",
+      \"decimals\": 18,
+      \"address\": \"0x514910771xf9ca656af840dff83e8264ecf986ca\",
+      \"minimal_record_resolution\" : \"10\",
+      \"max_per_block_imbalance\" : \"1925452883\",
+      \"max_total_imbalance\" : \"1925452883\",
+      \"internal\": True,
+      \"listed\": True 
+      }"
+```
+
+response
+
+```
+on success:
+{"success":true}
+on failure:
+{"success":false,
+ "reason":<error>}
+```
+
+### list token - (signing required) Prepare token listing and store the request as pending
+POST request 
+Post form: {"data" : "JSON enconding of token listing Object"}
+Note: This data is in the form of a map tokenID:TokenListing which allows mutiple token listing at once
+      The only params that allow null is TokenListing.Exchange.Info, which can be queried from exchange. 
+      If TokenListing.Exchange.Info is avaible, it will be prioritize over the exchange queried data.
+```
+<host>:8000/list-token
+```
+
+eg 
+
+```curl -X "POST" "http://localhost:8000/update-token" \
+     -H 'Content-Type: application/x-www-form-urlencoded'
+     --data-urlencode "data={  
+      \"AST\": {
+        \"Token\": {
+          \"id\": \"AST\",
+          \"name\": \"AirSwap\",
+          \"address\": \"0x27054b13b1b798b345b591a4d22e6562d47ea75a\",
+          \"decimals\": 18,
+          \"active\": True,
+          \"internal\": False,
+          \"minimal_record_resolution\" : \"10\",
+          \"max_per_block_imbalance\" : \"1925452883\",
+          \"max_total_imbalance\" : \"1925452883\",
+        },
+        \"Exchange\": {
+          \"binance\": {
+            \"DepositAddress\": \"0x111111111111111111111111\",
+            \"Fee\": {
+              \"Trading\": 2,
+              \"WithDraw\": 3,
+              \"Deposit\": 4
+            },
+            \"MinDeposit\": 15.04
+          }
+        }
+      }
+    }"
+
+```
+response
+
+```
+on success:
+{"success":true}
+on failure:
+{"success":false,
+ "reason":<error>}
+```
+
+### Get pednding token listing - (singing required) Return the current pending token listings information
+GET request
+
+``` 
+<host>:8000/pending-token-listing
+```
+
+eg
+```curl -X "GET" "http://localhost:8000/pending-token-listing"
+```
+
+response 
+```
+{data : {
+  "AST": {
+        "Token": {
+          "id": "AST",
+          "name": "AirSwap",
+          "address": "0x27054b13b1b798b345b591a4d22e6562d47ea75a",
+          "decimals": 18,
+          "active": True,
+          "internal": False,
+          "minimalRecordResolution": "10",
+          "maxTotalImbalance": "1925452883",
+          "maxPerBlockImbalance": "1925452883"
+        },
+        "Exchange": {
+          "binance": {
+            "DepositAddress": "0x111111111111111111111111",
+            "PrecisionLimit": {
+              "AST-ETH": {
+                "Precision": {
+                  "Amount": 0,
+                  "Price": 7
+                },
+                "AmountLimit": {
+                  "Min": 1,
+                  "Max": 90000000
+                },
+                "PriceLimit": {
+                  "Min": 1e-7,
+                  "Max": 100000
+                },
+                "MinNotional": 0.01
+              }
+            },
+            "Fee": {
+              "Trading": 2,
+              "WithDraw": 3,
+              "Deposit": 4
+            },
+            "MinDeposit": 15.04
+          }
+        }
+    }
+  }
+  "success" : {
+    true
+  }
+```
+
+### confirm token listing - (signing required) Confirm token listing and apply all the change to core.
+POST request 
+Post form: {"data" : "JSON enconding of token listing Object"}
+Note: This data is similar to token Listing, but all field must be the same as the current pending. 
+```
+<host>:8000/list-token
+```
+
+eg 
+
+```curl -X "POST" "http://localhost:8000/update-token" \
+     -H 'Content-Type: application/x-www-form-urlencoded'
+     --data-urlencode "data={  
+      \"AST\": {
+        \"Token\": {
+          \"id\": \"AST\",
+          \"name\": \"AirSwap\",
+          \"address\": \"0x27054b13b1b798b345b591a4d22e6562d47ea75a\",
+          \"decimals\": 18,
+          \"active\": True,
+          \"internal\": False,
+          \"minimal_record_resolution\" : \"10\",
+          \"max_per_block_imbalance\" : \"1925452883\",
+          \"max_total_imbalance\" : \"1925452883\",
+        },
+        \"Exchange\": {
+          \"binance\": {
+            \"DepositAddress\": \"0x111111111111111111111111\",
+            \"Fee\": {
+              \"Trading\": 2,
+              \"WithDraw\": 3,
+              \"Deposit\": 4
+            },
+              \"PrecisionLimit\": {
+                \"AST-ETH\": {
+                  \"Precision\": {
+                    \"Amount\": 0,
+                    \"Price\": 7
+                  },
+                  \"AmountLimit\": {
+                    \"Min\": 1,
+                    \"Max\": 90000000
+                  },
+                  \"PriceLimit\": {
+                    \"Min\": 1e-7,
+                    \"Max\": 100000
+                  },
+                  \"MinNotional\": 0.01
+                }
+              },
+            \"MinDeposit\": 15.04
+          }
+        }
+      }
+    }"
+
+```
+response
+
+```
+on success:
+{"success":true}
+on failure:
+{"success":false,
+ "reason":<error>}
+```
+
+### Reject pending token listing - (signing required) reject the listing and remove the current pending listing
+POST request
+
+```
+<host>:8000/reject-token-listing
+```
+
+eg
+
+```
+curl -X "POST" "http://localhost:8000/reject-token-listing" \
+     -H 'Content-Type: application/x-www-form-urlencoded'
+```
+
+response
+
+```
+on success:
+{"success":true}
+on failure:
+{"success":false,
+ "reason":<error>}
+```
+
+# Get Token settings - (signing required) get current token settings of core.
+GET request
+
+``` 
+<host>:8000/token-settings
+```
+
+eg
+```curl -X "GET" "http://localhost:8000/token-settings"
+```
+
+response 
+```
+{
+  "data": [
+    {
+      "id": "ABT",
+      "name": "",
+      "address": "0xb98d4c97425d9908e66e53a6fdf673acca0be986",
+      "decimals": 18,
+      "active": true,
+      "internal": true,
+      "minimal_record_resolution": "100000000000000",
+      "max_total_imbalance": "6043192343824681664512",
+      "max_per_block_imbalance": "5461044951947117854720"
+    }
+  ],
+  "success": true
+}
+```
+
+### update address - (signing required) update a single address
+POST request 
+Post form: {"name" : "Name of the address (reserve, deposit etc...)",
+            "address" : "Hex form of the new address"}
+Note: This is used to update single address object. For list of address object, use add-address-to-set instead
+```
+<host>:8000/update-address
+```
+
+eg 
+
+```curl -X "POST" "http://localhost:8000/update-address" \
+     -H 'Content-Type: application/x-www-form-urlencoded'
+     --data-urlencode "name = \"reserve\",
+      address = \"0x123456789aabbcceeeddff\"
+    }" 
+
+```
+response
+
+```
+on success:
+{"success":true}
+on failure:
+{"success":false,
+ "reason":<error>}
+```
+
+### add address to set- (signing required) add address to a list of address
+POST request 
+Post form: {"setname" : "Name of the address set(oldBurners etc...)",
+            "address" : "Hex form of the new address"}
+```
+<host>:8000/add-address-to-set
+```
+
+eg 
+
+```curl -X "POST" "http://localhost:8000/add-address-to-set" \
+     -H 'Content-Type: application/x-www-form-urlencoded'
+     --data-urlencode "
+      setname = "oldBurner",
+      address = "0x123456789aabbcceeeddff"
+    } 
+
+```
+response
+
+```
+on success:
+{"success":true}
+on failure:
+{"success":false,
+ "reason":<error>}
+```
+
 ## Authentication
 All APIs that are marked with (signing required) must follow authentication mechanism below:
 

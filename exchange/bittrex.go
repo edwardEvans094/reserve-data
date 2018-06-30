@@ -79,19 +79,21 @@ func (self *Bittrex) UpdateDepositAddress(token common.Token, address string) er
 	return self.setting.UpdateDepositAddress(settings.Bittrex, *addrs)
 }
 
-// GetLiveExchangeInfo querry the Exchange Endpoint for exchange precision and limit of a certain pair ID
+// GetLiveExchangeInfos querry the Exchange Endpoint for exchange precision and limit of a list of tokenPairIDs
 // It return error if occurs.
-func (self *Bittrex) GetLiveExchangeInfo(tokenPairID common.TokenPairID) (common.ExchangePrecisionLimit, error) {
-	var result common.ExchangePrecisionLimit
+func (self *Bittrex) GetLiveExchangeInfos(tokenPairIDs []common.TokenPairID) (common.ExchangeInfo, error) {
+	result := make(common.ExchangeInfo)
 	exchangeInfo, err := self.interf.GetExchangeInfo()
-
 	if err != nil {
 		return result, err
 	}
 	symbols := exchangeInfo.Pairs
-	result, ok := self.getPrecisionLimitFromSymbols(tokenPairID, symbols)
-	if !ok {
-		return result, fmt.Errorf("Bittrex Exchange Info reply doesn't contain token pair %s", string(tokenPairID))
+	for _, pairID := range tokenPairIDs {
+		epl, ok := self.getPrecisionLimitFromSymbols(pairID, symbols)
+		if !ok {
+			return result, fmt.Errorf("Bittrex Exchange Info reply doesn't contain token pair %s", string(pairID))
+		}
+		result[pairID] = epl
 	}
 	return result, nil
 }

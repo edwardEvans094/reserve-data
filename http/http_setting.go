@@ -27,7 +27,7 @@ type Setting interface {
 	GetExchangeStatus() (common.ExchangesStatus, error)
 	UpdateExchangeStatus(data common.ExchangesStatus) error
 	UpdatePendingTokenListings(map[string]common.TokenListing) error
-	ApplyTokenWithExchangeSetting([]common.Token, map[settings.ExchangeName]*common.CompositeExchangeSetting) error
+	ApplyTokenWithExchangeSetting([]common.Token, map[settings.ExchangeName]*common.ExchangeSetting) error
 	GetPendingTokenListings() (map[string]common.TokenListing, error)
 	RemovePendingTokenListings() error
 }

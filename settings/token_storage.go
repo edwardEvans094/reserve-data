@@ -34,6 +34,6 @@ type TokenStorage interface {
 	GetExternalTokenByAddress(ethereum.Address) (common.Token, error)
 	StorePendingTokenListings(map[string]common.TokenListing) error
 	GetPendingTokenListings() (map[string]common.TokenListing, error)
-	UpdateTokenWithExchangeSetting(t []common.Token, exSetting map[ExchangeName]*common.CompositeExchangeSetting) error
+	UpdateTokenWithExchangeSetting(t []common.Token, exSetting map[ExchangeName]*common.ExchangeSetting) error
 	RemovePendingTokenListings() error
 }

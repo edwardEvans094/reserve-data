@@ -90,17 +90,20 @@ func (self *Huobi) UpdateDepositAddress(token common.Token, address string) erro
 	return self.setting.UpdateDepositAddress(settings.Huobi, *addrs)
 }
 
-// GetLiveExchangeInfo querry the Exchange Endpoint for exchange precision and limit of a certain pair ID
+// GetLiveExchangeInfos querry the Exchange Endpoint for exchange precision and limit of a list of tokenPairIDs
 // It return error if occurs.
-func (self *Huobi) GetLiveExchangeInfo(tokenPairID common.TokenPairID) (common.ExchangePrecisionLimit, error) {
-	var result common.ExchangePrecisionLimit
+func (self *Huobi) GetLiveExchangeInfos(tokenPairIDs []common.TokenPairID) (common.ExchangeInfo, error) {
+	var result common.ExchangeInfo
 	exchangeInfo, err := self.interf.GetExchangeInfo()
 	if err != nil {
 		return result, err
 	}
-	result, ok := self.getPrecisionLimitFromSymbols(tokenPairID, exchangeInfo)
-	if !ok {
-		return result, fmt.Errorf("Huobi Exchange Info reply doesn't contain token pair %s", string(tokenPairID))
+	for _, pairID := range tokenPairIDs {
+		epl, ok := self.getPrecisionLimitFromSymbols(pairID, exchangeInfo)
+		if !ok {
+			return result, fmt.Errorf("Huobi Exchange Info reply doesn't contain token pair %s", string(pairID))
+		}
+		result[pairID] = epl
 	}
 	return result, nil
 }

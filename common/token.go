@@ -5,7 +5,7 @@ import ethereum "github.com/ethereum/go-ethereum/common"
 // TokenExchangeSetting contains necessary information on exchange to List a token on the fly
 type TokenExchangeSetting struct {
 	DepositAddress string
-	PrecisionLimit map[TokenPairID]ExchangePrecisionLimit
+	Info           ExchangeInfo
 	Fee            TokenFee
 	MinDeposit     float64
 }
@@ -28,9 +28,9 @@ type Token struct {
 	Decimal                 int64  `json:"decimals"`
 	Active                  bool   `json:"active"`
 	Internal                bool   `json:"internal"`
-	MinimalRecordResolution string `json:"minimalRecordResolution"`
-	MaxTotalImbalance       string `json:"maxTotalImbalance"`
-	MaxPerBlockImbalance    string `json:"maxPerBlockImbalance"`
+	MinimalRecordResolution string `json:"minimal_record_resolution"`
+	MaxTotalImbalance       string `json:"max_total_imbalance"`
+	MaxPerBlockImbalance    string `json:"max_per_block_imbalance"`
 }
 
 // NewToken creates a new Token.

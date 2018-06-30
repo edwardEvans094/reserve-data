@@ -59,8 +59,8 @@ func (self testExchange) GetTradeHistory(fromTime, toTime uint64) (common.Exchan
 	return common.ExchangeTradeHistory{}, nil
 }
 
-func (self testExchange) GetLiveExchangeInfo(pairID common.TokenPairID) (common.ExchangePrecisionLimit, error) {
-	return common.ExchangePrecisionLimit{}, nil
+func (self testExchange) GetLiveExchangeInfos(pairIDs []common.TokenPairID) (common.ExchangeInfo, error) {
+	return common.ExchangeInfo{}, nil
 }
 
 type testBlockchain struct {

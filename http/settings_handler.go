@@ -45,7 +45,7 @@ func (self *HTTPServer) reloadTokenIndices(newToken common.Token, active bool) e
 	return nil
 }
 
-func (self *HTTPServer) reloadMultipleTokensIndices(tokenListings map[string]common.TokenListing) error {
+func (self *HTTPServer) updateInternalTokensIndices(tokenListings map[string]common.TokenListing) error {
 	tokens, err := self.setting.GetInternalTokens()
 	if err != nil {
 		return err
@@ -62,7 +62,8 @@ func (self *HTTPServer) reloadMultipleTokensIndices(tokenListings map[string]com
 	return nil
 }
 
-func (self *HTTPServer) EnsureRunningExchange(ex string) (settings.ExchangeName, error) {
+// ensureRunningExchange makes sure that the exchange input is avaialbe in current deployment
+func (self *HTTPServer) ensureRunningExchange(ex string) (settings.ExchangeName, error) {
 	exName, ok := settings.ExchangTypeValues()[ex]
 	if !ok {
 		return exName, fmt.Errorf("Exchange %s is not in current deployment", ex)
@@ -81,9 +82,9 @@ func (self *HTTPServer) EnsureRunningExchange(ex string) (settings.ExchangeName,
 	return exName, nil
 }
 
-// getCompositeExchangeSetting will query the current exchange setting with key ExName.
+// getExchangeSetting will query the current exchange setting with key ExName.
 // return a struct contain all
-func (self *HTTPServer) getCompositeExchangeSetting(exName settings.ExchangeName) (*common.CompositeExchangeSetting, error) {
+func (self *HTTPServer) getExchangeSetting(exName settings.ExchangeName) (*common.ExchangeSetting, error) {
 	exFee, err := self.setting.GetFee(exName)
 	if err != nil {
 		return nil, err
@@ -100,40 +101,40 @@ func (self *HTTPServer) getCompositeExchangeSetting(exName settings.ExchangeName
 	if err != nil {
 		return nil, err
 	}
-	return common.NewCompositeExchangeSetting(depAddrs, exMinDep, exFee, exInfos), nil
+	return common.NewExchangeSetting(depAddrs, exMinDep, exFee, exInfos), nil
 }
 
-func (self *HTTPServer) PrepareExchangeSetting(token common.Token, tokExSetts map[string]common.TokenExchangeSetting, preparedExchangeSetting *map[settings.ExchangeName]*common.CompositeExchangeSetting) error {
+func (self *HTTPServer) prepareExchangeSetting(token common.Token, tokExSetts map[string]common.TokenExchangeSetting, preparedExchangeSetting map[settings.ExchangeName]*common.ExchangeSetting) error {
 	for ex, tokExSett := range tokExSetts {
-		exName, err := self.EnsureRunningExchange(ex)
+		exName, err := self.ensureRunningExchange(ex)
 		if err != nil {
 			return fmt.Errorf("Exchange %s is not in current deployment", ex)
 		}
-		comExSet, ok := (*preparedExchangeSetting)[exName]
-		//create a current compositeExchangeSetting from setting if it does not exist yet
+		comExSet, ok := preparedExchangeSetting[exName]
+		//create a current ExchangeSetting from setting if it does not exist yet
 		if !ok {
-			comExSet, err = self.getCompositeExchangeSetting(exName)
+			comExSet, err = self.getExchangeSetting(exName)
 			if err != nil {
 				return err
 			}
 		}
-		//update exchange Deposite Address for compositeExchangeSetting
-		comExSet.ExDepositAddress[token.ID] = ethereum.HexToAddress(tokExSett.DepositAddress)
+		//update exchange Deposite Address for ExchangeSetting
+		comExSet.DepositAddress[token.ID] = ethereum.HexToAddress(tokExSett.DepositAddress)
 
-		//update Exchange Info for compositeExchangeSetting
-		for pairID, epl := range tokExSett.PrecisionLimit {
-			comExSet.ExInfo[pairID] = epl
+		//update Exchange Info for ExchangeSetting
+		for pairID, epl := range tokExSett.Info {
+			comExSet.Info[pairID] = epl
 		}
 
-		//Update Exchange Fee for compositeExchangeSetting
-		comExSet.ExFee.Trading[token.ID] = tokExSett.Fee.Trading
-		comExSet.ExFee.Funding.Deposit[token.ID] = tokExSett.Fee.Deposit
-		comExSet.ExFee.Funding.Withdraw[token.ID] = tokExSett.Fee.WithDraw
+		//Update Exchange Fee for ExchangeSetting
+		comExSet.Fee.Trading[token.ID] = tokExSett.Fee.Trading
+		comExSet.Fee.Funding.Deposit[token.ID] = tokExSett.Fee.Deposit
+		comExSet.Fee.Funding.Withdraw[token.ID] = tokExSett.Fee.WithDraw
 
-		//Update Exchange Min deposit for compositeExchangeSetting
-		comExSet.ExMinDeposit[token.ID] = tokExSett.MinDeposit
+		//Update Exchange Min deposit for ExchangeSetting
+		comExSet.MinDeposit[token.ID] = tokExSett.MinDeposit
 
-		(*preparedExchangeSetting)[exName] = comExSet
+		preparedExchangeSetting[exName] = comExSet
 	}
 	return nil
 }
@@ -162,7 +163,7 @@ func (self *HTTPServer) ConfirmTokenListing(c *gin.Context) {
 		httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Can not get pending token listing (%s)", err.Error())))
 	}
 
-	preparedExchangeSetting := make(map[settings.ExchangeName]*common.CompositeExchangeSetting)
+	preparedExchangeSetting := make(map[settings.ExchangeName]*common.ExchangeSetting)
 	preparedToken := []common.Token{}
 
 	for tokenID, tokenListing := range tokenListings {
@@ -189,14 +190,14 @@ func (self *HTTPServer) ConfirmTokenListing(c *gin.Context) {
 			httputil.ResponseFailure(c, httputil.WithReason("Confirm and pending token listing request are not equal"))
 			return
 		}
-		if uErr := self.PrepareExchangeSetting(token, tokenListing.Exchange, &preparedExchangeSetting); uErr != nil {
+		if uErr := self.prepareExchangeSetting(token, tokenListing.Exchange, preparedExchangeSetting); uErr != nil {
 			httputil.ResponseFailure(c, httputil.WithError(uErr))
 			return
 		}
 	}
 
 	//reload token indices if the token is Internal
-	if err = self.reloadMultipleTokensIndices(tokenListings); err != nil {
+	if err = self.updateInternalTokensIndices(tokenListings); err != nil {
 		httputil.ResponseFailure(c, httputil.WithError(err))
 		return
 	}
@@ -223,6 +224,46 @@ func (self *HTTPServer) RejectTokenListing(c *gin.Context) {
 	httputil.ResponseSuccess(c)
 }
 
+// getInfosFromExchangeEndPoint assembles a map of exchange to lists of PairIDs and
+// query their exchange Info in one go
+func (self *HTTPServer) getInfosFromExchangeEndPoint(tokenListings map[string]common.TokenListing) (map[string]common.ExchangeInfo, error) {
+	const ETHID = "ETH"
+	exTokenPairIDs := make(map[string]([]common.TokenPairID))
+	result := make(map[string]common.ExchangeInfo)
+	for tokenID, TokenListing := range tokenListings {
+		for ex, exSetting := range TokenListing.Exchange {
+			_, err := self.ensureRunningExchange(ex)
+			if err != nil {
+				return result, err
+			}
+			info, ok := exTokenPairIDs[ex]
+			if !ok {
+				info = []common.TokenPairID{}
+			}
+			pairID := common.NewTokenPairID(tokenID, ETHID)
+			//if the current exchangeSetting already got precision limit for this pair, skip it
+			_, ok = exSetting.Info[pairID]
+			if ok {
+				continue
+			}
+			info = append(info, pairID)
+			exTokenPairIDs[ex] = info
+		}
+	}
+	for ex, tokenPairIDs := range exTokenPairIDs {
+		exchange, err := common.GetExchange(ex)
+		if err != nil {
+			return result, err
+		}
+		liveInfo, err := exchange.GetLiveExchangeInfos(tokenPairIDs)
+		if err != nil {
+			return result, err
+		}
+		result[ex] = liveInfo
+	}
+	return result, nil
+}
+
 // ListToken will pre-process the token request and put into pending token request
 // It will not apply any change to DB
 func (self *HTTPServer) ListToken(c *gin.Context) {
@@ -245,14 +286,18 @@ func (self *HTTPServer) ListToken(c *gin.Context) {
 	if err != nil {
 		log.Printf("WARNING: can not get Pending TargetQty v2, this will only allow listing non-internal token")
 	}
+
+	// verify exchange status and exchange precision limit for each exchange
+	exInfos, err := self.getInfosFromExchangeEndPoint(TokenListings)
+	if err != nil {
+		httputil.ResponseFailure(c, httputil.WithError(err))
+	}
+
 	// prepare each TokenListing instance for individual token
 	for tokenID, TokenListing := range TokenListings {
 		token := TokenListing.Token
 		// To list token, its active status must be true
-		if !token.Active {
-			httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("The listing token %s is inactive", tokenID)))
-			return
-		}
+		token.Active = true
 		//check if there is the token in pending PWIequation
 		if _, ok := pdPWI[token.ID]; (token.Internal) && (!ok) {
 			httputil.ResponseFailure(c, httputil.WithReason("The Token is not in current pendingPWIEquation "))
@@ -265,34 +310,21 @@ func (self *HTTPServer) ListToken(c *gin.Context) {
 			return
 		}
 
-		//verify exchange status and exchange precision limit for each exchange
-
 		for ex, tokExSett := range TokenListing.Exchange {
-			_, uErr := self.EnsureRunningExchange(ex)
-			if uErr != nil {
-				httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Exchange %s is not in current deployment", ex)))
-				return
-			}
 			//query exchangeprecisionlimit from exchange for the pair token-ETH
 			pairID := common.NewTokenPairID(token.ID, "ETH")
 
-			// If the pair is not in current token listing request, query it from exchange
-			_, ok := tokExSett.PrecisionLimit[pairID]
-			if !ok {
-				exchange, uErr := common.GetExchange(ex)
-				if uErr != nil {
-					httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Can not get exchange instance %s (%s)", ex, uErr)))
-					return
+			// If the pair is not in current token listing request, get its result from exchange
+			_, ok1 := tokExSett.Info[pairID]
+			if !ok1 {
+				if tokExSett.Info == nil {
+					tokExSett.Info = make(common.ExchangeInfo)
 				}
-				epl, uErr := exchange.GetLiveExchangeInfo(pairID)
-				if (uErr != nil) && (!ok) {
-					httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Can not prepare exchange info for token on exchange %s (%s). The exchange precision limit of pair %s-ETH must available either on exchange or manually send within the request", ex, uErr, tokenID)))
-					return
+				epl, ok2 := exInfos[ex].GetData()[pairID]
+				if !ok2 {
+					httputil.ResponseFailure(c, httputil.WithReason(fmt.Sprintf("Pair ID %s on exchange %s couldn't be queried for exchange presicion limit", pairID, ex)))
 				}
-				if tokExSett.PrecisionLimit == nil {
-					tokExSett.PrecisionLimit = make(map[common.TokenPairID]common.ExchangePrecisionLimit)
-				}
-				tokExSett.PrecisionLimit[pairID] = epl
+				tokExSett.Info[pairID] = epl
 			}
 			TokenListing.Exchange[ex] = tokExSett
 		}

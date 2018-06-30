@@ -212,7 +212,7 @@ func (boltSettingStorage *BoltSettingStorage) UpdateOneAddress(name settings.Add
 
 // UpdateTokenWithExchangeSetting will attempt to apply all the token and exchange settings
 // as well as remove pending Token listing in one TX. reroll and return err if occur
-func (boltSettingStorage *BoltSettingStorage) UpdateTokenWithExchangeSetting(tokens []common.Token, exSetting map[settings.ExchangeName]*common.CompositeExchangeSetting) error {
+func (boltSettingStorage *BoltSettingStorage) UpdateTokenWithExchangeSetting(tokens []common.Token, exSetting map[settings.ExchangeName]*common.ExchangeSetting) error {
 	err := boltSettingStorage.db.Update(func(tx *bolt.Tx) error {
 		//Apply tokens setting
 		for _, t := range tokens {
@@ -225,16 +225,16 @@ func (boltSettingStorage *BoltSettingStorage) UpdateTokenWithExchangeSetting(tok
 		}
 		//Apply exchanges setting
 		for exName, exSett := range exSetting {
-			if uErr := putDepositAddress(tx, exName, exSett.ExDepositAddress); uErr != nil {
+			if uErr := putDepositAddress(tx, exName, exSett.DepositAddress); uErr != nil {
 				return uErr
 			}
-			if uErr := putExchangeInfo(tx, exName, exSett.ExInfo); uErr != nil {
+			if uErr := putExchangeInfo(tx, exName, exSett.Info); uErr != nil {
 				return uErr
 			}
-			if uErr := putFee(tx, exName, exSett.ExFee); uErr != nil {
+			if uErr := putFee(tx, exName, exSett.Fee); uErr != nil {
 				return uErr
 			}
-			if uErr := putMinDeposit(tx, exName, exSett.ExMinDeposit); uErr != nil {
+			if uErr := putMinDeposit(tx, exName, exSett.MinDeposit); uErr != nil {
 				return uErr
 			}
 		}
@@ -294,8 +294,8 @@ func deletePendingTokenListings(tx *bolt.Tx) error {
 	}
 	c := b.Cursor()
 	for k, _ := c.First(); k != nil; k, _ = c.Next() {
-		if uErr := b.Delete(k); uErr != nil {
-			return uErr
+		if err := b.Delete(k); err != nil {
+			return err
 		}
 	}
 	return nil

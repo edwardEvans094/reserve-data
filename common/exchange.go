@@ -20,7 +20,10 @@ type Exchange interface {
 	MarshalText() (text []byte, err error)
 	GetInfo() (ExchangeInfo, error)
 	GetExchangeInfo(TokenPairID) (ExchangePrecisionLimit, error)
-	GetLiveExchangeInfo(TokenPairID) (ExchangePrecisionLimit, error)
+
+	// GetLiveExchangeInfo querry the Exchange Endpoint for exchange precision and limit of a list of tokenPairIDs
+	// It return error if occurs.
+	GetLiveExchangeInfos([]TokenPairID) (ExchangeInfo, error)
 	GetFee() (ExchangeFees, error)
 	GetMinDeposit() (ExchangesMinDeposit, error)
 	TokenAddresses() (map[string]ethereum.Address, error)
@@ -46,18 +49,21 @@ func MustGetExchange(id string) Exchange {
 	return result
 }
 
-type CompositeExchangeSetting struct {
-	ExDepositAddress ExchangeAddresses
-	ExMinDeposit     ExchangesMinDeposit
-	ExFee            ExchangeFees
-	ExInfo           ExchangeInfo
+// ExchangeSetting contain the composition of settings necessary for an exchange
+// It is use mainly to group all the setting for DB operations
+type ExchangeSetting struct {
+	DepositAddress ExchangeAddresses
+	MinDeposit     ExchangesMinDeposit
+	Fee            ExchangeFees
+	Info           ExchangeInfo
 }
 
-func NewCompositeExchangeSetting(depoAddr ExchangeAddresses, minDep ExchangesMinDeposit, fee ExchangeFees, info ExchangeInfo) *CompositeExchangeSetting {
-	return &CompositeExchangeSetting{
-		ExDepositAddress: depoAddr,
-		ExMinDeposit:     minDep,
-		ExFee:            fee,
-		ExInfo:           info,
+// NewExchangeSetting returns a pointer to A newly created ExchangeSetting instance
+func NewExchangeSetting(depoAddr ExchangeAddresses, minDep ExchangesMinDeposit, fee ExchangeFees, info ExchangeInfo) *ExchangeSetting {
+	return &ExchangeSetting{
+		DepositAddress: depoAddr,
+		MinDeposit:     minDep,
+		Fee:            fee,
+		Info:           info,
 	}
 }

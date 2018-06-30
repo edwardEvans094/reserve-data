@@ -87,7 +87,7 @@ func (setting *Settings) UpdateToken(t common.Token) error {
 	return setting.Tokens.Storage.UpdateToken(t)
 }
 
-func (setting *Settings) ApplyTokenWithExchangeSetting(tokens []common.Token, exSetting map[ExchangeName]*common.CompositeExchangeSetting) error {
+func (setting *Settings) ApplyTokenWithExchangeSetting(tokens []common.Token, exSetting map[ExchangeName]*common.ExchangeSetting) error {
 	return setting.Tokens.Storage.UpdateTokenWithExchangeSetting(tokens, exSetting)
 }
 

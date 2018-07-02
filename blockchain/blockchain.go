@@ -460,10 +460,7 @@ func (self *Blockchain) GetRawLogs(fromBlock uint64, toBlock uint64) ([]types.Lo
 		to        = big.NewInt(int64(toBlock))
 		addresses []ethereum.Address
 	)
-
-	// we have to track events from network and fee burner contracts
-	// including their old contracts
-	// TODO: append V2 contract addresses
+	
 	addresses = append(addresses, self.networkAddr, self.burnerAddr, self.whitelistAddr)
 	addresses = append(addresses, self.oldNetworks...)
 	addresses = append(addresses, self.oldBurners...)

@@ -130,7 +130,6 @@ func CreateBlockchain(config *configuration.Config, kyberENV string) (bc *blockc
 		panic(err)
 	}
 
-
 	// old contract addresses are used for events fetcher
 	switch kyberENV {
 	case common.PRODUCTION_MODE, common.MAINNET_MODE:

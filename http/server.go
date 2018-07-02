@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -643,6 +644,26 @@ func (self *HTTPServer) StoreMetrics(c *gin.Context) {
 	}
 }
 
+//ValidateExchangeInfo validate if data is complete exchange info with all token pairs supported
+// func ValidateExchangeInfo(exchange common.Exchange, data map[common.TokenPairID]common.ExchangePrecisionLimit) error {
+// 	exInfo, err :=self
+// 	pairs := exchange.Pairs()
+// 	for _, pair := range pairs {
+// 		// stable exchange is a simulated exchange which is not a real exchange
+// 		// we do not do rebalance on stable exchange then it also does not need to have exchange info (and it actully does not have one)
+// 		// therefore we skip checking it for supported tokens
+// 		if exchange.ID() == common.ExchangeID("stable_exchange") {
+// 			continue
+// 		}
+// 		if _, exist := data[pair.PairID()]; !exist {
+// 			return fmt.Errorf("exchange info of %s lack of token %s", exchange.ID(), string(pair.PairID()))
+// 		}
+// 	}
+// 	return nil
+// }
+
+//GetExchangeInfo return exchange info of one exchange if it is given exchangeID
+//otherwise return all exchanges info
 func (self *HTTPServer) GetExchangeInfo(c *gin.Context) {
 	exchangeParam := c.Query("exchangeid")
 	if exchangeParam == "" {
@@ -653,22 +674,27 @@ func (self *HTTPServer) GetExchangeInfo(c *gin.Context) {
 				httputil.ResponseFailure(c, httputil.WithError(err))
 				return
 			}
-			data[string(ex.ID())] = exchangeInfo
+			responseData := exchangeInfo.GetData()
+			// if err := ValidateExchangeInfo(exchangeInfo, responseData); err != nil {
+			// 	httputil.ResponseFailure(c, httputil.WithError(err))
+			// 	return
+			// }
+			data[string(ex.ID())] = responseData
 		}
 		httputil.ResponseSuccess(c, httputil.WithData(data))
-	} else {
-		exchange, err := common.GetExchange(exchangeParam)
-		if err != nil {
-			httputil.ResponseFailure(c, httputil.WithError(err))
-			return
-		}
-		exchangeInfo, err := exchange.GetInfo()
-		if err != nil {
-			httputil.ResponseFailure(c, httputil.WithError(err))
-			return
-		}
-		httputil.ResponseSuccess(c, httputil.WithData(exchangeInfo.GetData()))
+		return
 	}
+	exchange, err := common.GetExchange(exchangeParam)
+	if err != nil {
+		httputil.ResponseFailure(c, httputil.WithError(err))
+		return
+	}
+	exchangeInfo, err := exchange.GetInfo()
+	if err != nil {
+		httputil.ResponseFailure(c, httputil.WithError(err))
+		return
+	}
+	httputil.ResponseSuccess(c, httputil.WithData(exchangeInfo.GetData()))
 }
 
 func (self *HTTPServer) GetPairInfo(c *gin.Context) {
@@ -1609,6 +1635,7 @@ func (self *HTTPServer) GetTokenHeatmap(c *gin.Context) {
 	httputil.ResponseSuccess(c, httputil.WithData(data))
 }
 
+//SetTargetQtyV2 set token target quantity version 2
 func (self *HTTPServer) SetTargetQtyV2(c *gin.Context) {
 	postForm, ok := self.Authenticated(c, []string{}, []Permission{ConfigurePermission})
 	if !ok {
@@ -1619,6 +1646,19 @@ func (self *HTTPServer) SetTargetQtyV2(c *gin.Context) {
 		httputil.ResponseFailure(c, httputil.WithReason(errDataSizeExceed.Error()))
 		return
 	}
+	var tokenTargetQty metric.TokenTargetQtyV2
+	if err := json.Unmarshal(value, &tokenTargetQty); err != nil {
+		httputil.ResponseFailure(c, httputil.WithError(err))
+		return
+	}
+
+	for tokenID := range tokenTargetQty {
+		if _, err := self.setting.GetInternalTokenByID(tokenID); err != nil {
+			httputil.ResponseFailure(c, httputil.WithError(err))
+			return
+		}
+	}
+
 	err := self.metric.StorePendingTargetQtyV2(value)
 	if err != nil {
 		httputil.ResponseFailure(c, httputil.WithError(err))

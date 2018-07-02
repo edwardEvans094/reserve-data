@@ -98,8 +98,7 @@ func NewExchangePool(
 				go AsyncUpdateDepositAddress(bit, tokenID, addr.Hex(), &wait, setting)
 			}
 			wait.Wait()
-			err = bit.UpdatePairsPrecision()
-			if err != nil {
+			if err = bit.UpdatePairsPrecision(); err != nil {
 				return nil, fmt.Errorf("Can not Update Bittrex Pairs Precision : (%s)", err.Error())
 			}
 			exchanges[bit.ID()] = bit
@@ -128,8 +127,7 @@ func NewExchangePool(
 				go AsyncUpdateDepositAddress(bin, tokenID, addr.Hex(), &wait, setting)
 			}
 			wait.Wait()
-			err = bin.UpdatePairsPrecision()
-			if err != nil {
+			if err = bin.UpdatePairsPrecision(); err != nil {
 				return nil, fmt.Errorf("Can not Update Binance Pairs Precision: (%s)", err.Error())
 			}
 			exchanges[bin.ID()] = bin
@@ -164,8 +162,7 @@ func NewExchangePool(
 				go AsyncUpdateDepositAddress(huobi, tokenID, addr.Hex(), &wait, setting)
 			}
 			wait.Wait()
-			err = huobi.UpdatePairsPrecision()
-			if err != nil {
+			if err = huobi.UpdatePairsPrecision(); err != nil {
 				return nil, fmt.Errorf("Can not Update Huobi Pairs Precision: (%s)", err.Error())
 			}
 			exchanges[huobi.ID()] = huobi

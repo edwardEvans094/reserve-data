@@ -1313,13 +1313,14 @@ func (self *BoltStorage) RemovePendingStableTokenParams() error {
 	return err
 }
 
+//StorePendingTargetQtyV2 store value into pending target qty v2 bucket
 func (self *BoltStorage) StorePendingTargetQtyV2(value []byte) error {
 	var (
-		err  error
-		temp = make(map[string]interface{})
+		err         error
+		pendingData metric.TokenTargetQtyV2
 	)
 
-	if err = json.Unmarshal(value, &temp); err != nil {
+	if err = json.Unmarshal(value, &pendingData); err != nil {
 		return fmt.Errorf("Rejected: Data could not be unmarshalled to defined format: %s", err.Error())
 	}
 	err = self.db.Update(func(tx *bolt.Tx) error {
@@ -1333,8 +1334,9 @@ func (self *BoltStorage) StorePendingTargetQtyV2(value []byte) error {
 	return err
 }
 
-func (self *BoltStorage) GetPendingTargetQtyV2() (map[string]interface{}, error) {
-	result := make(map[string]interface{})
+//GetPendingTargetQtyV2 return current pending target quantity
+func (self *BoltStorage) GetPendingTargetQtyV2() (metric.TokenTargetQtyV2, error) {
+	result := metric.TokenTargetQtyV2{}
 	err := self.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(PENDING_TARGET_QUANTITY_V2))
 		k := []byte("current_pending_target_qty")
@@ -1347,14 +1349,16 @@ func (self *BoltStorage) GetPendingTargetQtyV2() (map[string]interface{}, error)
 	return result, err
 }
 
+//ConfirmTargetQtyV2 check if confirm data match pending data and save it to confirm bucket
+//remove pending data from pending bucket
 func (self *BoltStorage) ConfirmTargetQtyV2(value []byte) error {
-	temp := make(map[string]interface{})
-	err := json.Unmarshal(value, &temp)
+	confirmTargetQty := metric.TokenTargetQtyV2{}
+	err := json.Unmarshal(value, &confirmTargetQty)
 	if err != nil {
 		return fmt.Errorf("Rejected: Data could not be unmarshalled to defined format: %s", err)
 	}
 	pending, err := self.GetPendingTargetQtyV2()
-	if eq := reflect.DeepEqual(pending, temp); !eq {
+	if eq := reflect.DeepEqual(pending, confirmTargetQty); !eq {
 		return fmt.Errorf("Rejected: confiming data isn't consistent")
 	}
 
@@ -1385,8 +1389,8 @@ func (self *BoltStorage) RemovePendingTargetQtyV2() error {
 }
 
 // GetTargetQtyV2 return the current target quantity
-func (self *BoltStorage) GetTargetQtyV2() (map[string]interface{}, error) {
-	result := make(map[string]interface{})
+func (self *BoltStorage) GetTargetQtyV2() (metric.TokenTargetQtyV2, error) {
+	result := metric.TokenTargetQtyV2{}
 	err := self.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(TARGET_QUANTITY_V2))
 		k := []byte("current_target_qty")
@@ -1421,8 +1425,8 @@ func (self *BoltStorage) GetTargetQtyV2() (map[string]interface{}, error) {
 // while token is a string, it is validated before it saved then no need to validate again here
 // totalTarget, reserveTarget, rebalanceThreshold and transferThreshold are float numbers
 // and they are also no need to check to error here also (so we can ignore as below)
-func convertTargetQtyV1toV2(target metric.TokenTargetQty) map[string]interface{} {
-	result := make(map[string]interface{})
+func convertTargetQtyV1toV2(target metric.TokenTargetQty) metric.TokenTargetQtyV2 {
+	result := metric.TokenTargetQtyV2{}
 	strTargets := strings.Split(target.Data, "|")
 	for _, target := range strTargets {
 		elements := strings.Split(target, "_")
@@ -1434,7 +1438,7 @@ func convertTargetQtyV1toV2(target metric.TokenTargetQty) map[string]interface{}
 		reserveTarget, _ := strconv.ParseFloat(elements[2], 10)
 		rebalance, _ := strconv.ParseFloat(elements[3], 10)
 		withdraw, _ := strconv.ParseFloat(elements[4], 10)
-		result[token] = metric.TargetQtyStruct{
+		result[token] = metric.TargetQtyV2{
 			SetTarget: metric.TargetQtySet{
 				TotalTarget:        totalTarget,
 				ReserveTarget:      reserveTarget,

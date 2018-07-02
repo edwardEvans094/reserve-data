@@ -19,7 +19,7 @@ import (
 	"github.com/KyberNetwork/reserve-data/stat"
 	ethereum "github.com/ethereum/go-ethereum/common"
 	"github.com/robfig/cron"
-	lumberjack "gopkg.in/natefinch/lumberjack.v2"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 const (
@@ -97,8 +97,8 @@ func configLog(stdoutLog bool) {
 	c.Start()
 }
 
-func InitInterface(kyberENV string) {
-	if base_url != configuration.Baseurl {
+func InitInterface() {
+	if base_url != defaultBaseURL {
 		log.Printf("Overwriting base URL with %s \n", base_url)
 	}
 	configuration.SetInterface(base_url)

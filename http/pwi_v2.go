@@ -49,11 +49,6 @@ func (self *HTTPServer) SetPWIEquationV2(c *gin.Context) {
 		}
 	}
 
-	if !input.IsValid() {
-		httputil.ResponseFailure(c, httputil.WithReason("invalid input"))
-		return
-	}
-
 	if err := self.metric.StorePendingPWIEquationV2(data); err != nil {
 		httputil.ResponseFailure(c, httputil.WithError(err))
 		return

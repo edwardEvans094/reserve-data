@@ -83,7 +83,8 @@ func GetSetting(setPath SettingPaths) (*settings.Settings, error) {
 
 func GetConfig(kyberENV string, authEnbl bool, endpointOW string, noCore, enableStat bool) *Config {
 	setPath := GetConfigPaths(kyberENV)
-	world, err := world.NewTheWorld(kyberENV, setPath.secretPath)
+
+	theWorld, err := world.NewTheWorld(kyberENV, setPath.secretPath)
 	if err != nil {
 		panic("Can't init the world (which is used to get global data), err " + err.Error())
 	}
@@ -147,7 +148,7 @@ func GetConfig(kyberENV string, authEnbl bool, endpointOW string, noCore, enable
 		AuthEngine:              hmac512auth,
 		EnableAuthentication:    authEnbl,
 		Archive:                 s3archive,
-		World:                   world,
+		World:                   theWorld,
 		Setting:                 setting,
 	}
 

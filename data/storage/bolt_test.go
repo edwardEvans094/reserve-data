@@ -93,9 +93,9 @@ func TestConvertTargetQtyV1toV2(t *testing.T) {
 	for _, data := range v2Data {
 		bytes, err := json.Marshal(data)
 		if err != nil {
-			t.Fatalf("Expected data is a interface of metric TargetQtyStruct")
+			t.Fatalf("Expected data is a interface of metric TargetQtyV2")
 		}
-		v2Struct := metric.TargetQtyStruct{}
+		v2Struct := metric.TargetQtyV2{}
 		if err := json.Unmarshal(bytes, &v2Struct); err != nil {
 			t.Fatalf("Expected data is a inteface of metric")
 		}

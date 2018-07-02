@@ -1,5 +1,9 @@
 package metric
 
+import (
+	"fmt"
+)
+
 type TokenMetric struct {
 	AfpMid float64
 	Spread float64
@@ -17,7 +21,7 @@ type TokenMetricResponse struct {
 	Spread    float64
 }
 
-// Metric list for one token
+// MetricList list for one token
 type MetricList []TokenMetricResponse
 
 type MetricResponse struct {
@@ -39,14 +43,17 @@ type PWIEquation struct {
 	Data string `json:"data"`
 }
 
+//RebalanceControl represent status of rebalance, true is enable and false is disable
 type RebalanceControl struct {
 	Status bool `json:"status"`
 }
 
+//SetrateControl represent status of set rate ability, true is enable and false is disable
 type SetrateControl struct {
 	Status bool `json:"status"`
 }
 
+//TargetQtySet represent a set of target quantity
 type TargetQtySet struct {
 	TotalTarget        float64 `json:"total_target"`
 	ReserveTarget      float64 `json:"reserve_target"`
@@ -54,10 +61,15 @@ type TargetQtySet struct {
 	TransferThreshold  float64 `json:"transfer_threshold"`
 }
 
-//TargetQtyStruct object for save target qty
-type TargetQtyStruct struct {
-	SetTarget TargetQtySet `json:"set_target"`
+//TargetQtyV2 object for save target qty
+type TargetQtyV2 struct {
+	SetTarget        TargetQtySet       `json:"set_target"`
+	RecommendBalance map[string]float64 `json:"recomend_balance,omitempty"`
+	ExchangeRatio    map[string]float64 `json:"exchange_ratio,omitempty"`
 }
+
+//TokenTargetQtyV2 represent a map of token and its target quantity struct
+type TokenTargetQtyV2 map[string]TargetQtyV2
 
 // PWIEquationV2 contains the information of a PWI equation.
 type PWIEquationV2 struct {
@@ -71,7 +83,7 @@ type PWIEquationV2 struct {
 // PWIEquationTokenV2 is a mapping between a token id and a PWI equation.
 type PWIEquationTokenV2 map[string]PWIEquationV2
 
-// isValid validates the input instance and return true if it is valid.
+// validate checks if the equation has all the required fields.
 // Example:
 // {
 //  "bid": {
@@ -89,35 +101,32 @@ type PWIEquationTokenV2 map[string]PWIEquationV2
 //    "price_multiply_factor": "0"
 //  }
 //}
-func (et PWIEquationTokenV2) isValid() bool {
+func (et PWIEquationTokenV2) validate() error {
 	var requiredFields = []string{"bid", "ask"}
 	// validates that both bid and ask are present
-	if len(et) != len(requiredFields) {
-		return false
-	}
-
 	for _, field := range requiredFields {
 		if _, ok := et[field]; !ok {
-			return false
+			return fmt.Errorf("missing required field: %s", field)
 		}
 	}
-	return true
+	return nil
 }
 
 // PWIEquationRequestV2 is the input SetPWIEquationV2 api.
 type PWIEquationRequestV2 map[string]PWIEquationTokenV2
 
-// IsValid validates the input instance and return true if it is valid.
+// Validate returns nil if the input is valid, otherwise it will
+// return an error with detail which field is invalid.
 // Example input:
 // [{"token_id": {equation_token}}, ...]
-func (input PWIEquationRequestV2) IsValid() bool {
-	for _, et := range input {
-		if !et.isValid() {
-			return false
+func (input PWIEquationRequestV2) Validate() error {
+	for tokenID, et := range input {
+		if err := et.validate(); err != nil {
+			return fmt.Errorf("invalid equation for token %s: %s", tokenID, err)
 		}
-	}
 
-	return true
+	}
+	return nil
 }
 
 //RebalanceQuadraticEquation represent an equation

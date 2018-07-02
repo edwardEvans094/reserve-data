@@ -13,10 +13,8 @@ import (
 )
 
 const (
-	BaseURL    string        = "https://ropsten-core.kyber.network"
-	TweiAdjust float64       = 1000000000000000000
-	SleepTime  time.Duration = 60 //sleep time for forever run mode
-	DifferRate float64       = 0.001
+	TweiAdjust float64 = 1000000000000000000
+	DifferRate float64 = 0.001
 )
 
 //AllRateHTTPReply To hold all rate response and its request status

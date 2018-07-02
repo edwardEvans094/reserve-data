@@ -13,7 +13,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const remoteLogPath string = "core-log/"
+const (
+	remoteLogPath  string = "core-log/"
+	defaultBaseURL        = "http://127.0.0.1"
+)
 
 // logDir is located at base of this repository.
 var logDir = filepath.Join(filepath.Dir(filepath.Dir(common.CurrentDir())), "log")
@@ -37,7 +40,7 @@ func serverStart(_ *cobra.Command, _ []string) {
 	}
 	//get configuration from ENV variable
 	kyberENV := common.RunningMode()
-	InitInterface(kyberENV)
+	InitInterface()
 	config := GetConfigFromENV(kyberENV)
 	backupLog(config.Archive)
 
@@ -119,7 +122,7 @@ func init() {
 	startServer.Flags().BoolVarP(&noAuthEnable, "noauth", "", false, "disable authentication")
 	startServer.Flags().IntVarP(&servPort, "port", "p", 8000, "server port")
 	startServer.Flags().StringVar(&endpointOW, "endpoint", "", "endpoint, default to configuration file")
-	startServer.PersistentFlags().StringVar(&base_url, "base_url", "http://127.0.0.1", "base_url for authenticated enpoint")
+	startServer.PersistentFlags().StringVar(&base_url, "base_url", defaultBaseURL, "base_url for authenticated enpoint")
 	startServer.Flags().BoolVarP(&enableStat, "enable-stat", "", false, "enable stat related fetcher and api, event logs will not be fetched")
 	startServer.Flags().BoolVarP(&noCore, "no-core", "", false, "disable core related fetcher and api, this should be used only when we want to run an independent stat server")
 	startServer.Flags().BoolVarP(&stdoutLog, "log-to-stdout", "", false, "send log to both log file and stdout terminal")

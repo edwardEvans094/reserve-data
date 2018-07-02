@@ -48,3 +48,7 @@ func (self TestExchange) UpdateDepositAddress(token Token, address string) error
 func (self TestExchange) GetTradeHistory(fromTime, toTime uint64) (ExchangeTradeHistory, error) {
 	return ExchangeTradeHistory{}, nil
 }
+
+func (self TestExchange) Pairs() []TokenPair {
+	return nil
+}

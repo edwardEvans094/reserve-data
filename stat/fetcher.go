@@ -28,14 +28,15 @@ const (
 	SUCCESS                string = "OK"
 	NO_TXS_FOUND           string = "No transactions found"
 
-	TRADE_SUMMARY_AGGREGATION  string = "trade_summary_aggregation"
-	WALLET_AGGREGATION         string = "wallet_aggregation"
-	COUNTRY_AGGREGATION        string = "country_aggregation"
-	USER_AGGREGATION           string = "user_aggregation"
-	VOLUME_STAT_AGGREGATION    string = "volume_stat_aggregation"
-	BURNFEE_AGGREGATION        string = "burn_fee_aggregation"
-	USER_INFO_AGGREGATION      string = "user_info_aggregation"
-	RESERVE_VOLUME_AGGREGATION string = "reserve_volume_aggregation"
+	TRADE_SUMMARY_AGGREGATION string = "trade_summary_aggregation"
+	WALLET_AGGREGATION        string = "wallet_aggregation"
+	COUNTRY_AGGREGATION       string = "country_aggregation"
+	VOLUME_STAT_AGGREGATION   string = "volume_stat_aggregation"
+	BURNFEE_AGGREGATION       string = "burn_fee_aggregation"
+	USER_INFO_AGGREGATION     string = "user_info_aggregation"
+
+	etherScanAPIEndpoint      = "http://api.etherscan.io/api"
+	broadcastKyberAPIEndpoint = "https://broadcast.kyber.network"
 )
 
 type Fetcher struct {
@@ -145,7 +146,7 @@ func (self *Fetcher) FetchTxs(client http.Client) error {
 	if err != nil {
 		return err
 	}
-	api := fmt.Sprintf("http://api.etherscan.io/api?module=account&action=txlist&address=%s&startblock=%d&endblock=%d&apikey=%s", pricingAddress.String(), fromBlock, toBlock, self.apiKey)
+	api := fmt.Sprintf("%s?module=account&action=txlist&address=%s&startblock=%d&endblock=%d&apikey=%s", etherScanAPIEndpoint, pricingAddress.String(), fromBlock, toBlock, self.apiKey)
 	log.Println("api get txs of setrate: ", api)
 	resp, err := client.Get(api)
 	if err != nil {
@@ -784,7 +785,7 @@ func (self *Fetcher) RunBlockFetcher() {
 
 //GetTradeGeo get geo from trade log
 func GetTradeGeo(txHash string) (string, string, error) {
-	url := fmt.Sprintf("https://broadcast.kyber.network/get-tx-info/%s", txHash)
+	url := fmt.Sprintf("%s/get-tx-info/%s", broadcastKyberAPIEndpoint, txHash)
 
 	resp, err := http.Get(url)
 	if err != nil {

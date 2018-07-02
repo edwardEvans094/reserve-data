@@ -13,6 +13,11 @@ import (
 	"github.com/KyberNetwork/reserve-data/common"
 )
 
+const (
+	cmcEthereumPricingAPIEndpoint = "https://graphs2.coinmarketcap.com/currencies/ethereum/"
+	cmcTopUSDPricingAPIEndpoint   = "https://api.coinmarketcap.com/v1/ticker/?convert=USD&limit=10"
+)
+
 type CoinCapRateResponse []struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
@@ -97,7 +102,7 @@ func fetchRate(timepoint uint64) ([][]float64, error) {
 	fromTime := GetTimeStamp(year, month, 1, 0, 0, 0, 0, time.UTC)
 	toMonth, toYear := GetNextMonth(int(month), year)
 	toTime := GetTimeStamp(toYear, time.Month(toMonth), 1, 0, 0, 0, 0, time.UTC)
-	api := "https://graphs2.coinmarketcap.com/currencies/ethereum/" + strconv.FormatInt(int64(fromTime), 10) + "/" + strconv.FormatInt(int64(toTime), 10) + "/"
+	api := cmcEthereumPricingAPIEndpoint + strconv.FormatInt(int64(fromTime), 10) + "/" + strconv.FormatInt(int64(toTime), 10) + "/"
 	resp, err := http.Get(api)
 	if err != nil {
 		return [][]float64{}, err
@@ -145,7 +150,7 @@ func (self *CMCEthUSDRate) RunGetEthRate() {
 }
 
 func (self *CMCEthUSDRate) FetchEthRate() (err error) {
-	resp, err := http.Get("https://api.coinmarketcap.com/v1/ticker/?convert=USD&limit=10")
+	resp, err := http.Get(cmcTopUSDPricingAPIEndpoint)
 	if err != nil {
 		return err
 	}

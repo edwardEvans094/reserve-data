@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	SleepTime time.Duration = 60 //sleep time for forever run mode
+	sleepTime                  time.Duration = 60 //sleep time for forever run mode
+	defaultCompareRatesBaseURL               = "https://internal-mainnet-core.kyber.network"
 )
 
 var baseURL string
@@ -29,7 +30,7 @@ func compareratestart(cmd *cobra.Command, args []string) {
 		for {
 			params["toTime"] = strconv.FormatInt((time.Now().UnixNano() / int64(time.Millisecond)), 10)
 			comparerates.DoQuery(baseURL, params, *config)
-			time.Sleep(SleepTime * time.Second)
+			time.Sleep(sleepTime * time.Second)
 			params["fromTime"] = params["toTime"]
 		}
 
@@ -49,7 +50,7 @@ var compareRates = &cobra.Command{
 
 func init() {
 	//compare rate flags
-	compareRates.Flags().StringVar(&baseURL, "url", "https://internal-mainnet-core.kyber.network", "base URL for API query")
+	compareRates.Flags().StringVar(&baseURL, "url", defaultCompareRatesBaseURL, "base URL for API query")
 	compareRates.Flags().StringVar(&fromTime, "from_time", "", "begining time for query, required params")
 	if err := compareRates.MarkFlagRequired("from_time"); err != nil {
 		log.Fatalf(err.Error())

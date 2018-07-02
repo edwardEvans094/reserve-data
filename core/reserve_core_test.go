@@ -58,6 +58,10 @@ func (self testExchange) GetTradeHistory(fromTime, toTime uint64) (common.Exchan
 	return common.ExchangeTradeHistory{}, nil
 }
 
+func (self testExchange) Pairs() []common.TokenPair {
+	return nil
+}
+
 type testBlockchain struct {
 }
 

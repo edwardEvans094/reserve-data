@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/KyberNetwork/reserve-data/common"
 	"github.com/KyberNetwork/reserve-data/core"
 	"github.com/KyberNetwork/reserve-data/data"
 	"github.com/KyberNetwork/reserve-data/data/storage"
@@ -26,18 +27,22 @@ func TestHTTPServerTargetQtyV2(t *testing.T) {
 		rejectTargetQtyV2       = "/v2/canceltargetqty"
 		getTargetQtyV2          = "/v2/targetqty"
 		testData                = `{
-  "EOS": {
-      "total_target": 750,
-      "reserve_target": 500,
-	  "rebalance_threshold": 0.25,
-	  "transfer_threshold": 0.343
+  "OMG": {
+	  "set_target": {
+	      "total_target": 750,
+	      "reserve_target": 500,
+		  "rebalance_threshold": 0.25,
+		  "transfer_threshold": 0.343
+	  }
   },
   "ETH": {
-      "total_target": 750,
-      "reserve_target": 500,
-	  "rebalance_target": 0.25,
-	  "transfer_threshold": 0.343,
-	  "minimum_amount" : {
+	  "set_target": {
+	      "total_target": 750,
+	      "reserve_target": 500,
+		  "rebalance_target": 0.25,
+		  "transfer_threshold": 0.343
+	  },
+	  "recommend_balance" : {
 		"huobi" : 10,
 		"binance" : 20
 	  }, "exchange_ratio":  {
@@ -47,19 +52,50 @@ func TestHTTPServerTargetQtyV2(t *testing.T) {
   }
 }
 `
+
+		testDataTokenNotSupported = `{
+  "SNT": {
+	  "set_target": {
+ 	     "total_target": 750,
+ 	     "reserve_target": 500,
+		  "rebalance_threshold": 0.25,
+		  "transfer_threshold": 0.343
+	  }
+  },
+  "ETH": {
+	  "set_target": {
+	      "total_target": 750,
+	      "reserve_target": 500,
+		  "rebalance_target": 0.25,
+		  "transfer_threshold": 0.343
+	  },
+	  "recommend_balance" : {
+		"huobi" : 10,
+		"binance" : 20
+	  }, "exchange_ratio":  {
+		"huobi": 3,
+		"bianace": 4
+	}
+  }
+		}`
+
 		testDataWrongConfirmation = `{
-  "EOS": {
-      "total_target": 751,
-      "reserve_target": 500,
-	  "rebalance_threshold": 0.25,
-	  "transfer_threshold": 0.343
+  "OMG": {
+	  "set_target": {
+	      "total_target": 751,
+	      "reserve_target": 500,
+		  "rebalance_threshold": 0.25,
+		  "transfer_threshold": 0.343
+	  }
     },
   "ETH": {
-      "total_target": 750,
-      "reserve_target": 500,
-	  "rebalance_target": 0.25,
-	  "transfer_threshold": 0.343,
-	  "minimum_amount" : {
+	  "set_target": {
+	      "total_target": 750,
+	      "reserve_target": 500,
+		  "rebalance_target": 0.25,
+		  "transfer_threshold": 0.343
+	  },
+	  "recommend_balance" : {
 		"huobi" : 10,
 		"binance" : 20
 	  },
@@ -71,6 +107,10 @@ func TestHTTPServerTargetQtyV2(t *testing.T) {
 }
 `
 	)
+
+	common.RegisterInternalActiveToken(common.Token{ID: "ETH"})
+	common.RegisterInternalActiveToken(common.Token{ID: "OMG"})
+
 	tmpDir, err := ioutil.TempDir("", "test_target_qty_v2")
 	if err != nil {
 		t.Fatal(err)
@@ -146,6 +186,15 @@ func TestHTTPServerTargetQtyV2(t *testing.T) {
 			assert:   httputil.ExpectFailure,
 		},
 		{
+			msg:      "token not supported",
+			endpoint: storePendingTargetQtyV2,
+			method:   http.MethodPost,
+			data: map[string]string{
+				"value": testDataTokenNotSupported,
+			},
+			assert: httputil.ExpectFailure,
+		},
+		{
 			msg:      "valid post form",
 			endpoint: storePendingTargetQtyV2,
 			method:   http.MethodPost,
@@ -182,7 +231,7 @@ func TestHTTPServerTargetQtyV2(t *testing.T) {
 			assert: httputil.ExpectSuccess,
 		},
 		{
-			msg:      "valid post form",
+			msg:      "post a valid form to test reject",
 			endpoint: storePendingTargetQtyV2,
 			method:   http.MethodPost,
 			data: map[string]string{
@@ -191,7 +240,7 @@ func TestHTTPServerTargetQtyV2(t *testing.T) {
 			assert: httputil.ExpectSuccess,
 		},
 		{
-			msg:      "reject when there is pending equation",
+			msg:      "reject when there is pending target quantity",
 			endpoint: rejectTargetQtyV2,
 			method:   http.MethodPost,
 			data: map[string]string{

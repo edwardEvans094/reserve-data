@@ -96,11 +96,13 @@ func (self ExchangeInfo) GetData() map[TokenPairID]ExchangePrecisionLimit {
 	return data
 }
 
+//TokenPairPrecision represent precision when trading a token pair
 type TokenPairPrecision struct {
 	Amount int
 	Price  int
 }
 
+//TokenPairAmountLimit represent amount min and max when trade a token pair
 type TokenPairAmountLimit struct {
 	Min float64
 	Max float64

@@ -108,9 +108,6 @@ func TestHTTPServerTargetQtyV2(t *testing.T) {
 `
 	)
 
-	common.RegisterInternalActiveToken(common.Token{ID: "ETH"})
-	common.RegisterInternalActiveToken(common.Token{ID: "OMG"})
-
 	tmpDir, err := ioutil.TempDir("", "test_target_qty_v2")
 	if err != nil {
 		t.Fatal(err)
@@ -146,7 +143,24 @@ func TestHTTPServerTargetQtyV2(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	err = setting.UpdateToken(common.Token{
+		ID:       "OMG",
+		Address:  "xxx",
+		Internal: true,
+		Active:   true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = setting.UpdateToken(common.Token{
+		ID:       "ETH",
+		Address:  "xxx",
+		Internal: true,
+		Active:   true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	s := HTTPServer{
 		app:         data.NewReserveData(st, nil, nil, nil, nil, nil, setting),
 		core:        core.NewReserveCore(nil, st, setting),
